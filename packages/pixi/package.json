@@ -1,0 +1,33 @@
+{
+    "name": "@ecsx/pixi",
+    "libName": "ecsxPixi",
+    "version": "1.0.0",
+    "description": "",
+    "main": "lib/main.js",
+    "types": "src/main.ts",
+    "scripts": {
+        "build": "webpack"
+    },
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@ecsx/core": "*"
+    },
+    "devDependencies": {
+        "ts-loader": "^6.2.2",
+        "tslib": "^1.11.1",
+        "typescript": "^3.8.3",
+        "webpack": "^4.42.1",
+        "webpack-cli": "^3.3.11"
+    },
+    "ava": {
+        "files": [
+            "src/**/*.spec.ts"
+        ],
+        "typescript": {
+            "rewritePaths": {
+                "src/": ".tmp/test-build/"
+            }
+        }
+    }
+}
