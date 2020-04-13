@@ -1,24 +1,25 @@
 {
-    "name": "@ecsx/pixi",
-    "libName": "ecsxPixi",
+    "name": "@ecsx/pixijs",
+    "libName": "ecsxPixiJs",
     "version": "1.0.0",
     "description": "",
     "main": "lib/main.js",
     "types": "src/main.ts",
     "scripts": {
-        "build": "webpack"
+        "build": "rollup -c rollup.config.js",
+        "watch": "rollup -c rollup.config.js -w"
     },
     "author": "",
     "license": "ISC",
     "dependencies": {
-        "@ecsx/core": "*"
+        "@ecsx/core": "*",
+        "pixi.js": "^5.2.1"
     },
     "devDependencies": {
-        "ts-loader": "^6.2.2",
+        "rollup": "^2.3.4",
+        "rollup-plugin-typescript": "^1.0.1",
         "tslib": "^1.11.1",
-        "typescript": "^3.8.3",
-        "webpack": "^4.42.1",
-        "webpack-cli": "^3.3.11"
+        "typescript": "^3.8.3"
     },
     "ava": {
         "files": [
