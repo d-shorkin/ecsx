@@ -1,6 +1,0 @@
-inputs:
-  - url: https://github.com/gaucho-v/FeatchWeather-ReactJS
-    strategy: downloads-package-json
-  - url: https://github.com/gaucho-v/Planner-jQuery
-    strategy: push-gitignore-file
-uploadDir: ./uploads
