@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "boot": "lerna bootstrap"
+    "boot": "lerna bootstrap",
+    "dev": "lerna run --parallel watch"
   },
   "author": "",
   "license": "ISC",

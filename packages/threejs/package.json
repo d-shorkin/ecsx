@@ -1,6 +1,6 @@
 {
-  "name": "@ecsx/core",
-  "libName": "ecsxCore",
+  "name": "@ecsx/threejs",
+  "libName": "ecsxThreeJs",
   "version": "1.0.0",
   "description": "",
   "main": "lib/main.js",
@@ -11,11 +11,13 @@
   },
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "@ecsx/core": "*",
+    "three": "^0.115.0"
+  },
   "devDependencies": {
-    "@rollup/plugin-node-resolve": "^7.1.1",
     "rollup": "^2.3.4",
-    "rollup-plugin-typescript2": "^0.27.0",
-    "three": "^0.115.0",
+    "rollup-plugin-typescript": "^1.0.1",
     "tslib": "^1.11.1",
     "typescript": "^3.8.3"
   },
@@ -28,8 +30,5 @@
         "src/": ".tmp/test-build/"
       }
     }
-  },
-  "dependencies": {
-    "@rollup/plugin-typescript": "^4.0.0"
   }
 }

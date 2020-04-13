@@ -32,7 +32,7 @@ export class Entity extends EventEmitter<EntityEvents> implements IInitEntity {
     );
   }
 
-  has<T extends IComponent>(componentClass: ComponentConstructor<T>) {
+  hasComponent<T extends IComponent>(componentClass: ComponentConstructor<T>) {
     const tag = componentClass.tag || componentClass.name;
     const component = this.components[tag];
     if (!component) return false;
@@ -44,7 +44,7 @@ export class Entity extends EventEmitter<EntityEvents> implements IInitEntity {
     return true;
   }
 
-  get<T extends IComponent>(componentClass: ComponentConstructor<T>): T {
+  getComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): T {
     const tag = componentClass.tag || componentClass.name;
     const component = this.components[tag];
     if (!component) {
@@ -58,7 +58,7 @@ export class Entity extends EventEmitter<EntityEvents> implements IInitEntity {
     return component;
   }
 
-  put<T extends IComponent>(componentClass: ComponentConstructor<T>): T {
+  addComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): T {
     const tag = componentClass.tag || componentClass.name;
     const component = this.components[tag];
     if (component) {
@@ -80,7 +80,7 @@ export class Entity extends EventEmitter<EntityEvents> implements IInitEntity {
     return newComponent;
   }
 
-  remove<T extends IComponent>(componentClass: ComponentConstructor<T>) {
+  removeComponent<T extends IComponent>(componentClass: ComponentConstructor<T>) {
     const tag = componentClass.tag || componentClass.name;
     const component = this.components[tag];
     if (!component) {

@@ -23,6 +23,8 @@ export type EngineEvents = {
   entityAdded: (entity: IEntity) => void;
   entityRemoved: (entity: IEntity) => void;
   entityUpdated: (entity: IEntity) => void;
+  beforeUpdate: (engine: IEngine) => void;
+  afterUpdate: (engine: IEngine) => void;
 };
 
 export interface NotComponent<T extends IComponent> {
@@ -46,13 +48,13 @@ export interface IEntity extends IEventEmitter<EntityEvents> {
 
   listComponentsWithTags(): { tag: string, component: IComponent }[];
 
-  has<T extends IComponent>(componentClass: ComponentConstructor<T>): boolean;
+  hasComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): boolean;
 
-  get<T extends IComponent>(componentClass: ComponentConstructor<T>): T;
+  getComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): T;
 
-  put<T extends IComponent>(componentClass: ComponentConstructor<T>): T;
+  addComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): T;
 
-  remove<T extends IComponent>(componentClass: ComponentConstructor<T>): void;
+  removeComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): void;
 }
 
 export interface IInitEntity extends IEntity, ILoopCounterChild {
@@ -91,6 +93,12 @@ export interface IEntityCollection {
   getEntities(): IEntity[];
 }
 
+export interface IFamily extends IEntityCollection {
+  getRemoved(): IEntity[];
+
+  getNews(): IEntity[]
+}
+
 export interface IFamilyFactory {
-  createFamily(components: Array<ComponentConstructor<IComponent> | NotComponent<IComponent>>): IEntityCollection;
+  createFamily(components: Array<ComponentConstructor<IComponent> | NotComponent<IComponent>>): IFamily;
 }

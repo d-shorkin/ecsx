@@ -3,7 +3,7 @@ import {
   EngineEvents, EntityUpdateEvent, IComponent,
   IEngine,
   IEntity,
-  IEntityCollection,
+  IEntityCollection, IFamily,
   IInitEntity,
   ILoopCounter,
   ISystem, NotComponent
@@ -16,7 +16,7 @@ type SystemWithLoopCounter = {
   system: ISystem
 };
 
-type Families = { [p: string]: IEntityCollection };
+type Families = { [p: string]: IFamily };
 
 export class Engine extends EventEmitter<EngineEvents> implements IEngine, ILoopCounter {
   private entities: IEntity[] = [];
@@ -50,7 +50,7 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine, ILoop
     this.emit("entityRemoved", entity);
 
     entity.listComponentsWithTypes().forEach(({type}) => {
-      entity.remove(type);
+      entity.removeComponent(type);
     });
 
     this.entities = this.entities.filter(e => e !== entity);
@@ -66,12 +66,14 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine, ILoop
   }
 
   update(delta: number): void {
+    this.emit("beforeUpdate", this);
     this.systems.forEach((s) => {
       this.lastLoop = s.loop;
       s.system.execute(this, delta);
       this.currentLoop++;
       s.loop = this.currentLoop;
-    })
+    });
+    this.emit("afterUpdate", this);
   }
 
   getCurrent(): number {
@@ -82,7 +84,7 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine, ILoop
     return this.lastLoop;
   }
 
-  createFamily(components: (ComponentConstructor<IComponent> | NotComponent<IComponent>)[]): IEntityCollection {
+  createFamily(components: (ComponentConstructor<IComponent> | NotComponent<IComponent>)[]): IFamily {
     let key = '';
 
     const include: ComponentConstructor<IComponent>[] = [];
@@ -103,7 +105,7 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine, ILoop
       this.families[key] = new Family(this, include, exclude);
     }
 
-    return this.entities[key];
+    return this.families[key];
   }
 
   private onEntityUpdate = (data: EntityUpdateEvent) => {

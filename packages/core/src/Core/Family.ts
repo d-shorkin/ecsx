@@ -1,10 +1,13 @@
-import {ComponentConstructor, IComponent, IEngine, IEntity, IEntityCollection} from "./Contract";
+import {ComponentConstructor, IComponent, IEngine, IEntity, IFamily} from "./Contract";
 
-export class Family implements IEntityCollection {
+export class Family implements IFamily {
   private engine: IEngine;
   private included: ComponentConstructor<IComponent>[] = [];
   private excluded: ComponentConstructor<IComponent>[] = [];
+
   private entities: IEntity[] = [];
+  private news: IEntity[] = [];
+  private removed: IEntity[] = [];
 
   constructor(engine: IEngine, included: ComponentConstructor<IComponent>[], excluded: ComponentConstructor<IComponent>[]) {
     this.engine = engine;
@@ -14,6 +17,7 @@ export class Family implements IEntityCollection {
     this.engine.on("entityAdded", (entity) => {
       if (this.isIncludedEntity(entity)) {
         this.entities.push(entity);
+        this.news.push(entity);
       }
     });
 
@@ -24,6 +28,7 @@ export class Family implements IEntityCollection {
       }
 
       this.entities.splice(index, 1);
+      this.removed.push(entity);
     });
 
     this.engine.on("entityUpdated", (entity) => {
@@ -31,29 +36,40 @@ export class Family implements IEntityCollection {
       if (index !== -1) {
         if (!this.isIncludedEntity(entity)) {
           this.entities.splice(index, 1);
+          this.removed.push(entity);
         }
       } else if (this.isIncludedEntity(entity)) {
         this.entities.push(entity);
+        this.news.push(entity);
       }
-
     });
 
-    this.recalculateEntities();
+    engine.on("beforeUpdate", () => {
+      this.news = [];
+      this.removed = [];
+    });
+
+    this.entities = this.engine.getEntities().filter(this.isIncludedEntity.bind(this));
+    this.news = [...this.entities];
   }
 
   getEntities(): IEntity[] {
     return this.entities;
   }
 
-  private recalculateEntities() {
-    this.entities = this.engine.getEntities().filter(this.isIncludedEntity.bind(this));
+  getNews(): IEntity[] {
+    return this.news;
+  }
+
+  getRemoved(): IEntity[] {
+    return this.removed;
   }
 
   private isIncludedEntity(entity: IEntity): boolean {
-    if (this.included.some((type) => (!entity.has(type)))) {
+    if (this.included.some((type) => (!entity.hasComponent(type)))) {
       return false;
     }
 
-    return !this.excluded.some((type) => (entity.has(type)));
+    return !this.excluded.some((type) => (entity.hasComponent(type)));
   }
 }
