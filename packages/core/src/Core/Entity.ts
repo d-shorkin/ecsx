@@ -44,7 +44,7 @@ export class Entity extends EventEmitter<EntityEvents> implements IInitEntity {
     return true;
   }
 
-  getComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): T {
+  getComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): Readonly<T> {
     const tag = componentClass.tag || componentClass.name;
     const component = this.components[tag];
     if (!component) {
@@ -58,7 +58,7 @@ export class Entity extends EventEmitter<EntityEvents> implements IInitEntity {
     return component;
   }
 
-  addComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): T {
+  addComponent<T extends IComponent>(componentClass: ComponentConstructor<T>, newComponent?: T): Readonly<T> {
     const tag = componentClass.tag || componentClass.name;
     const component = this.components[tag];
     if (component) {
@@ -67,13 +67,17 @@ export class Entity extends EventEmitter<EntityEvents> implements IInitEntity {
           `There are multiple classes with the same tag or name "${tag}".\nAdd a different property "tag" to one of them.`
         );
       }
+
+      component.destroy();
       delete this.components[tag];
       delete this.componentClasses[tag];
     }
-    const newComponent = new componentClass();
-    if (this.counter) {
-      newComponent._setLoopCounter(this.counter);
+
+    if(!newComponent){
+      newComponent = new componentClass();
     }
+
+    newComponent._setEntity(this);
     this.components[tag] = newComponent;
     this.componentClasses[tag] = componentClass;
     this.emit("putComponent", {componentClass, tag, component, entity: this});
@@ -93,6 +97,7 @@ export class Entity extends EventEmitter<EntityEvents> implements IInitEntity {
     }
     delete this.components[tag];
     this.emit("removeComponent", {componentClass, tag, component, entity: this});
+    component.destroy();
   }
 
   _setId(id: number) {

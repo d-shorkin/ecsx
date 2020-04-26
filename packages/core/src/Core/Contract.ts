@@ -1,13 +1,13 @@
 import {IEventEmitter} from "../Events/IEventEmitter";
 
-export interface ComponentConstructor<T extends IComponent<object>> {
+export interface ComponentConstructor<T extends IComponent> {
   readonly name: string;
   readonly tag?: string;
 
-  new(): T;
+  new(...args: any): T;
 }
 
-export interface EntityUpdateEvent<T extends IComponent<object> = IComponent<object>> {
+export interface EntityUpdateEvent<T extends IComponent = IComponent> {
   entity: IEntity;
   tag: string;
   componentClass: ComponentConstructor<T>
@@ -31,15 +31,21 @@ export interface NotComponent<T extends IComponent> {
   not: ComponentConstructor<T>
 }
 
-export interface IComponent<T extends object = object> extends ILoopCounterChild {
-  get<K extends keyof T>(key: K): T[K];
+export interface IComponent extends ILoopCounterChild {
+  getEntity(): IEntity;
 
-  set<K extends keyof T>(key: K, data: T[K]): void;
+  set<K extends keyof this>(key: K, data: this[K]): void;
 
-  hasUpdate<K extends keyof T>(key: K): boolean;
+  hasUpdate<K extends keyof this>(key: K): boolean;
+
+  hasAnyUpdates(...keys: Array<keyof this>): boolean;
+
+  destroy(): void;
+
+  _setEntity(entity: IEntity): void;
 }
 
-export interface IEntity extends IEventEmitter<EntityEvents> {
+export interface IEntity<A extends IComponent = IComponent> extends IEventEmitter<EntityEvents> {
   getId(): number;
 
   listComponents(): IComponent[];
@@ -48,13 +54,13 @@ export interface IEntity extends IEventEmitter<EntityEvents> {
 
   listComponentsWithTags(): { tag: string, component: IComponent }[];
 
-  hasComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): boolean;
+  hasComponent<T extends A>(componentClass: ComponentConstructor<T>): boolean;
 
-  getComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): T;
+  getComponent<T extends A>(componentClass: ComponentConstructor<T>): Readonly<T>;
 
-  addComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): T;
+  addComponent<T extends A>(componentClass: ComponentConstructor<T>): Readonly<T>;
 
-  removeComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): void;
+  removeComponent<T extends A>(componentClass: ComponentConstructor<T>): void;
 }
 
 export interface IInitEntity extends IEntity, ILoopCounterChild {
@@ -100,5 +106,5 @@ export interface IFamily extends IEntityCollection {
 }
 
 export interface IFamilyFactory {
-  createFamily(components: Array<ComponentConstructor<IComponent> | NotComponent<IComponent>>): IFamily;
+  createFamily(...components: Array<ComponentConstructor<IComponent> | NotComponent<IComponent>>): IFamily;
 }

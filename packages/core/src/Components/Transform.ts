@@ -4,18 +4,6 @@ import {Quaternion} from 'three/src/math/Quaternion';
 import {Euler} from 'three/src/math/Euler';
 import {Vector3} from 'three/src/math/Vector3';
 
-export interface TransformData {
-  positionX: number;
-  positionY: number;
-  positionZ: number;
-  rotationX: number;
-  rotationY: number;
-  rotationZ: number;
-  scaleX: number;
-  scaleY: number;
-  scaleZ: number;
-}
-
 export interface TransformDataClear {
   position: Vector3;
   scale: Vector3;
@@ -23,20 +11,18 @@ export interface TransformDataClear {
   quaternion: Quaternion;
 }
 
-export class Transform extends Component<TransformData> {
+export class Transform extends Component {
   static tag = 'core/transform';
 
-  protected data: TransformData = {
-    positionX: 0,
-    positionY: 0,
-    positionZ: 0,
-    rotationX: 0,
-    rotationY: 0,
-    rotationZ: 0,
-    scaleX: 1,
-    scaleY: 1,
-    scaleZ: 1
-  };
+  positionX: number = 0;
+  positionY: number = 0;
+  positionZ: number = 0;
+  rotationX: number = 0;
+  rotationY: number = 0;
+  rotationZ: number = 0;
+  scaleX: number = 1;
+  scaleY: number = 1;
+  scaleZ: number = 1;
 
   private clearData: TransformDataClear = {
     position: new Vector3(),
@@ -52,6 +38,8 @@ export class Transform extends Component<TransformData> {
     scale: new Vector3(1, 1, 1)
   };
 
+  private worldTransform?: Transform;
+
   private needsUpdateLocalMatrix: boolean = false;
   private needsUpdateQuaternion: boolean = false;
   private worldMatrixUpdated: boolean = false;
@@ -60,7 +48,7 @@ export class Transform extends Component<TransformData> {
   private localMatrix: Matrix4 = new Matrix4();
   private commonMatrix: Matrix4 = new Matrix4();
 
-  set<K extends keyof TransformData>(key: K, data: TransformData[K]): void {
+  set<K extends keyof this>(key: K, data: this[K]): void {
     let changed = false;
     switch (key) {
       case "positionX":
@@ -116,34 +104,16 @@ export class Transform extends Component<TransformData> {
     return this.clearData.rotation;
   }
 
-  getWorld<K extends keyof TransformData>(key: K): TransformData[K] {
+  getWorld<K extends keyof Transform>(key: K): Transform[K] {
     this.updateMatrix();
-    switch (key) {
-      case "positionX":
-        return this.worldData.position.x;
-      case "positionY":
-        return this.worldData.position.y;
-      case "positionZ":
-        return this.worldData.position.z;
-      case "rotationX":
-        return this.worldData.rotation.x;
-      case "rotationY":
-        return this.worldData.rotation.y;
-      case "rotationZ":
-        return this.worldData.rotation.z;
-      case "scaleX":
-        return this.worldData.scale.x;
-      case "scaleY":
-        return this.worldData.scale.y;
-      case "scaleZ":
-        return this.worldData.scale.z;
-      default:
-        throw new Error(`Wrong key ${key}`);
+    if(this.worldTransform){
+      return this.worldTransform[key];
     }
+    throw new Error('cannot find world transform')
   }
 
-  _matrixHasUpdates(): boolean {
-    return this.needsUpdateLocalMatrix || this.worldMatrixUpdated;
+  _hasLocalUpdate(): boolean {
+    return this.needsUpdateLocalMatrix;
   }
 
   _getMatrix(): Matrix4 {
@@ -161,17 +131,31 @@ export class Transform extends Component<TransformData> {
       this.localMatrix.compose(this.clearData.position, this.getQuaternion(), this.clearData.scale);
     }
 
-    if (this._matrixHasUpdates()) {
+    if (this._hasLocalUpdate() || this.worldMatrixUpdated) {
       this.commonMatrix.identity().multiplyMatrices(this.worldMatrix, this.localMatrix);
       this.commonMatrix.decompose(this.worldData.position, this.worldData.quaternion, this.worldData.scale);
       this.worldData.rotation.setFromQuaternion(this.worldData.quaternion);
+
+      if(!this.worldTransform){
+        this.worldTransform = new Transform()
+      }
+
+      this.worldTransform.positionX = this.worldData.position.x;
+      this.worldTransform.positionY = this.worldData.position.y;
+      this.worldTransform.positionZ = this.worldData.position.z;
+      this.worldTransform.rotationX = this.worldData.rotation.x;
+      this.worldTransform.rotationY = this.worldData.rotation.y;
+      this.worldTransform.rotationZ = this.worldData.rotation.z;
+      this.worldTransform.scaleX = this.worldData.scale.x;
+      this.worldTransform.scaleY = this.worldData.scale.y;
+      this.worldTransform.scaleZ = this.worldData.scale.z;
     }
 
     this.needsUpdateLocalMatrix = false;
     this.worldMatrixUpdated = false;
   }
 
-  private setValuesHasChanges<T extends object, K extends keyof T>(obj: T, key: K, value: T[K]): boolean {
+  private setValuesHasChanges<T extends object, K extends keyof T>(obj: T, key: K, value: any): boolean {
     if (obj[key] !== value) {
       obj[key] = value;
       return true;

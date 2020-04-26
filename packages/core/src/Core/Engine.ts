@@ -84,7 +84,7 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine, ILoop
     return this.lastLoop;
   }
 
-  createFamily(components: (ComponentConstructor<IComponent> | NotComponent<IComponent>)[]): IFamily {
+  createFamily(...components: (ComponentConstructor<IComponent> | NotComponent<IComponent>)[]): IFamily {
     let key = '';
 
     const include: ComponentConstructor<IComponent>[] = [];

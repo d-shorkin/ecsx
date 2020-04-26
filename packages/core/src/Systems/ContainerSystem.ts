@@ -1,4 +1,4 @@
-import {IEngine, IFamily, ISystem} from "../Core/Contract";
+import {IEngine, IEntity, IFamily, ISystem} from "../Core/Contract";
 import {Container, Transform} from "../Components";
 import {Matrix4} from "three/src/math/Matrix4";
 import {castComponent} from "../Core/Helpers";
@@ -9,7 +9,7 @@ export class ContainerSystem implements ISystem {
   private withChildren: IFamily;
 
   onAttach(engine: IEngine): void {
-    this.withChildren = engine.createFamily([Container, Transform]);
+    this.withChildren = engine.createFamily(Container, Transform);
     this.withChildren.getNews().forEach(e => e.on('removeComponent', this.onRemoveComponent))
   }
 
@@ -19,26 +19,22 @@ export class ContainerSystem implements ISystem {
 
     this.withChildren.getEntities().forEach(e => {
       const transform = e.getComponent(Transform);
-      if (
-        e.getComponent(Container).hasUpdate("children") ||
-        transform.hasUpdate("positionX") ||
-        transform.hasUpdate("positionY") ||
-        transform.hasUpdate("positionZ") ||
-        transform.hasUpdate("rotationX") ||
-        transform.hasUpdate("rotationY") ||
-        transform.hasUpdate("rotationZ") ||
-        transform.hasUpdate("scaleX") ||
-        transform.hasUpdate("scaleY") ||
-        transform.hasUpdate("scaleZ") ||
-        transform._matrixHasUpdates()
-      ) {
-        e.getComponent(Container).get('children').forEach(child => {
-          if (!child.hasComponent(Transform)) {
-            child.addComponent(Transform);
-          }
+      if (e.getComponent(Container).hasUpdate("children") || transform._hasLocalUpdate()) {
+        this.recursiveChangeTransform(e, transform)
+      }
+    });
+  }
 
-          child.getComponent(Transform)._setWorldMatrix(transform._getMatrix());
-        });
+  recursiveChangeTransform(e: IEntity, transform: Transform | Readonly<Transform>) {
+    e.getComponent(Container).children.forEach(child => {
+      if (!child.hasComponent(Transform)) {
+        child.addComponent(Transform);
+      }
+
+      child.getComponent(Transform)._setWorldMatrix(transform._getMatrix());
+
+      if (child.hasComponent(Container)) {
+        this.recursiveChangeTransform(child, child.getComponent(Transform))
       }
     });
   }
@@ -48,13 +44,10 @@ export class ContainerSystem implements ISystem {
       return;
     }
 
-    component.get('children').forEach((e) => {
-      if (!e.hasComponent(Transform)) {
-        return;
+    component.children.forEach((e) => {
+      if (e.hasComponent(Transform)) {
+        e.getComponent(Transform)._setWorldMatrix(baseMatrix);
       }
-
-      e.getComponent(Transform)._setWorldMatrix(baseMatrix);
     })
   }
-
 }

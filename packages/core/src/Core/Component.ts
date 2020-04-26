@@ -1,37 +1,45 @@
-import {IComponent, ILoopCounter} from "./Contract";
+import {IComponent, IEntity, ILoopCounter} from "./Contract";
 
 type UpdatesDates<T extends object> = {[K in keyof T]?: number}
 
-export abstract class Component<T extends object> implements IComponent<T> {
-  protected abstract data: T;
-  private updates: UpdatesDates<T> = {};
+export abstract class Component implements IComponent {
+  private updates: UpdatesDates<this> = {};
   private createdAt: number;
   private counter: ILoopCounter | null = null;
+  private entity: IEntity;
 
-  get<K extends keyof T>(key: K): T[K] {
-    return this.data[key];
-  }
-
-  set<K extends keyof T>(key: K, data: T[K]): void {
-    if (this.counter) {
-      this.updates[key] = this.counter.getCurrent();
-    }
-    this.data[key] = data;
-  }
-
-  hasUpdate<K extends keyof T>(key: K): boolean {
+  hasUpdate<K extends keyof this>(key: K): boolean {
     if (!this.counter || this.createdAt >= this.counter.getLast()) {
       return true;
     }
     return !!this.updates[key] && this.updates[key] >= this.counter.getLast();
   }
 
+  hasAnyUpdates(...keys: Array<keyof this>): boolean {
+    return keys.some(k => this.hasUpdate(k));
+  }
+
+  getEntity(): IEntity {
+    return this.entity;
+  }
+
   _setLoopCounter(counter: ILoopCounter): void {
     this.counter = counter;
     this.createdAt = counter.getCurrent();
   }
-}
 
-export abstract class TagComponent extends Component<{}> {
-  protected data = {};
+  _setEntity(entity: IEntity): void {
+    this.entity = entity;
+  }
+
+  set<K extends keyof this>(key: K, data: this[K]): void {
+    if (this.counter) {
+      this.updates[key] = this.counter.getCurrent();
+    }
+    this[key] = data;
+  }
+
+  destroy(): void {
+    // may be overwrite by extends class
+  }
 }

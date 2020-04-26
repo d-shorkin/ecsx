@@ -2,8 +2,8 @@ import {ComponentConstructor, IComponent, IEngine, IEntity, IFamily} from "./Con
 
 export class Family implements IFamily {
   private engine: IEngine;
-  private included: ComponentConstructor<IComponent>[] = [];
-  private excluded: ComponentConstructor<IComponent>[] = [];
+  private included: ComponentConstructor<IComponent>[];
+  private excluded: ComponentConstructor<IComponent>[];
 
   private entities: IEntity[] = [];
   private news: IEntity[] = [];
@@ -44,7 +44,7 @@ export class Family implements IFamily {
       }
     });
 
-    engine.on("beforeUpdate", () => {
+    engine.on("afterUpdate", () => {
       this.news = [];
       this.removed = [];
     });

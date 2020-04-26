@@ -47,6 +47,25 @@ function castComponent(component, componentClass) {
 function Not(componentClass) {
     return { not: componentClass };
 }
+var CompositeFamily = /** @class */ (function () {
+    function CompositeFamily() {
+        var families = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            families[_i] = arguments[_i];
+        }
+        this.families = families;
+    }
+    CompositeFamily.prototype.getEntities = function () {
+        return this.families.reduce(function (acc, f) { return acc.concat(f.getEntities()); }, []);
+    };
+    CompositeFamily.prototype.getNews = function () {
+        return this.families.reduce(function (acc, f) { return acc.concat(f.getNews()); }, []);
+    };
+    CompositeFamily.prototype.getRemoved = function () {
+        return this.families.reduce(function (acc, f) { return acc.concat(f.getRemoved()); }, []);
+    };
+    return CompositeFamily;
+}());
 
 var EventEmitter = /** @class */ (function () {
     function EventEmitter() {
@@ -158,20 +177,21 @@ var Entity = /** @class */ (function (_super) {
         }
         return component;
     };
-    Entity.prototype.addComponent = function (componentClass) {
+    Entity.prototype.addComponent = function (componentClass, newComponent) {
         var tag = componentClass.tag || componentClass.name;
         var component = this.components[tag];
         if (component) {
             if (!castComponent(component, componentClass)) {
                 throw new Error("There are multiple classes with the same tag or name \"" + tag + "\".\nAdd a different property \"tag\" to one of them.");
             }
+            component.destroy();
             delete this.components[tag];
             delete this.componentClasses[tag];
         }
-        var newComponent = new componentClass();
-        if (this.counter) {
-            newComponent._setLoopCounter(this.counter);
+        if (!newComponent) {
+            newComponent = new componentClass();
         }
+        newComponent._setEntity(this);
         this.components[tag] = newComponent;
         this.componentClasses[tag] = componentClass;
         this.emit("putComponent", { componentClass: componentClass, tag: tag, component: component, entity: this });
@@ -188,6 +208,7 @@ var Entity = /** @class */ (function (_super) {
         }
         delete this.components[tag];
         this.emit("removeComponent", { componentClass: componentClass, tag: tag, component: component, entity: this });
+        component.destroy();
     };
     Entity.prototype._setId = function (id) {
         if (this.id) {
@@ -205,8 +226,6 @@ var Entity = /** @class */ (function (_super) {
 var Family = /** @class */ (function () {
     function Family(engine, included, excluded) {
         var _this = this;
-        this.included = [];
-        this.excluded = [];
         this.entities = [];
         this.news = [];
         this.removed = [];
@@ -240,7 +259,7 @@ var Family = /** @class */ (function () {
                 _this.news.push(entity);
             }
         });
-        engine.on("beforeUpdate", function () {
+        engine.on("afterUpdate", function () {
             _this.news = [];
             _this.removed = [];
         });
@@ -328,12 +347,16 @@ var Engine = /** @class */ (function (_super) {
     Engine.prototype.getLast = function () {
         return this.lastLoop;
     };
-    Engine.prototype.createFamily = function (components) {
+    Engine.prototype.createFamily = function () {
+        var components = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            components[_i] = arguments[_i];
+        }
         var key = '';
         var include = [];
         var exclude = [];
-        for (var _i = 0, components_1 = components; _i < components_1.length; _i++) {
-            var c = components_1[_i];
+        for (var _a = 0, components_1 = components; _a < components_1.length; _a++) {
+            var c = components_1[_a];
             if (typeof c === "object") {
                 exclude.push(c.not);
             }
@@ -356,36 +379,41 @@ var Component = /** @class */ (function () {
         this.updates = {};
         this.counter = null;
     }
-    Component.prototype.get = function (key) {
-        return this.data[key];
-    };
-    Component.prototype.set = function (key, data) {
-        if (this.counter) {
-            this.updates[key] = this.counter.getCurrent();
-        }
-        this.data[key] = data;
-    };
     Component.prototype.hasUpdate = function (key) {
         if (!this.counter || this.createdAt >= this.counter.getLast()) {
             return true;
         }
         return !!this.updates[key] && this.updates[key] >= this.counter.getLast();
     };
+    Component.prototype.hasAnyUpdates = function () {
+        var _this = this;
+        var keys = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            keys[_i] = arguments[_i];
+        }
+        return keys.some(function (k) { return _this.hasUpdate(k); });
+    };
+    Component.prototype.getEntity = function () {
+        return this.entity;
+    };
     Component.prototype._setLoopCounter = function (counter) {
         this.counter = counter;
         this.createdAt = counter.getCurrent();
     };
+    Component.prototype._setEntity = function (entity) {
+        this.entity = entity;
+    };
+    Component.prototype.set = function (key, data) {
+        if (this.counter) {
+            this.updates[key] = this.counter.getCurrent();
+        }
+        this[key] = data;
+    };
+    Component.prototype.destroy = function () {
+        // may be overwrite by extends class
+    };
     return Component;
 }());
-var TagComponent = /** @class */ (function (_super) {
-    __extends(TagComponent, _super);
-    function TagComponent() {
-        var _this = _super !== null && _super.apply(this, arguments) || this;
-        _this.data = {};
-        return _this;
-    }
-    return TagComponent;
-}(Component));
 
 /**
  * @author alteredq / http://alteredqualia.com/
@@ -3179,17 +3207,15 @@ var Transform = /** @class */ (function (_super) {
     __extends(Transform, _super);
     function Transform() {
         var _this = _super !== null && _super.apply(this, arguments) || this;
-        _this.data = {
-            positionX: 0,
-            positionY: 0,
-            positionZ: 0,
-            rotationX: 0,
-            rotationY: 0,
-            rotationZ: 0,
-            scaleX: 1,
-            scaleY: 1,
-            scaleZ: 1
-        };
+        _this.positionX = 0;
+        _this.positionY = 0;
+        _this.positionZ = 0;
+        _this.rotationX = 0;
+        _this.rotationY = 0;
+        _this.rotationZ = 0;
+        _this.scaleX = 1;
+        _this.scaleY = 1;
+        _this.scaleZ = 1;
         _this.clearData = {
             position: new Vector3(),
             rotation: new Euler(),
@@ -3264,31 +3290,13 @@ var Transform = /** @class */ (function (_super) {
     };
     Transform.prototype.getWorld = function (key) {
         this.updateMatrix();
-        switch (key) {
-            case "positionX":
-                return this.worldData.position.x;
-            case "positionY":
-                return this.worldData.position.y;
-            case "positionZ":
-                return this.worldData.position.z;
-            case "rotationX":
-                return this.worldData.rotation.x;
-            case "rotationY":
-                return this.worldData.rotation.y;
-            case "rotationZ":
-                return this.worldData.rotation.z;
-            case "scaleX":
-                return this.worldData.scale.x;
-            case "scaleY":
-                return this.worldData.scale.y;
-            case "scaleZ":
-                return this.worldData.scale.z;
-            default:
-                throw new Error("Wrong key " + key);
+        if (this.worldTransform) {
+            return this.worldTransform[key];
         }
+        throw new Error('cannot find world transform');
     };
-    Transform.prototype._matrixHasUpdates = function () {
-        return this.needsUpdateLocalMatrix || this.worldMatrixUpdated;
+    Transform.prototype._hasLocalUpdate = function () {
+        return this.needsUpdateLocalMatrix;
     };
     Transform.prototype._getMatrix = function () {
         this.updateMatrix();
@@ -3302,10 +3310,22 @@ var Transform = /** @class */ (function (_super) {
         if (this.needsUpdateLocalMatrix) {
             this.localMatrix.compose(this.clearData.position, this.getQuaternion(), this.clearData.scale);
         }
-        if (this._matrixHasUpdates()) {
+        if (this._hasLocalUpdate() || this.worldMatrixUpdated) {
             this.commonMatrix.identity().multiplyMatrices(this.worldMatrix, this.localMatrix);
             this.commonMatrix.decompose(this.worldData.position, this.worldData.quaternion, this.worldData.scale);
             this.worldData.rotation.setFromQuaternion(this.worldData.quaternion);
+            if (!this.worldTransform) {
+                this.worldTransform = new Transform();
+            }
+            this.worldTransform.positionX = this.worldData.position.x;
+            this.worldTransform.positionY = this.worldData.position.y;
+            this.worldTransform.positionZ = this.worldData.position.z;
+            this.worldTransform.rotationX = this.worldData.rotation.x;
+            this.worldTransform.rotationY = this.worldData.rotation.y;
+            this.worldTransform.rotationZ = this.worldData.rotation.z;
+            this.worldTransform.scaleX = this.worldData.scale.x;
+            this.worldTransform.scaleY = this.worldData.scale.y;
+            this.worldTransform.scaleZ = this.worldData.scale.z;
         }
         this.needsUpdateLocalMatrix = false;
         this.worldMatrixUpdated = false;
@@ -3325,11 +3345,59 @@ var Container = /** @class */ (function (_super) {
     __extends(Container, _super);
     function Container() {
         var _this = _super !== null && _super.apply(this, arguments) || this;
-        _this.data = { children: [] };
+        _this.children = [];
         return _this;
     }
     Container.tag = 'core/container';
     return Container;
+}(Component));
+
+var Renderer = /** @class */ (function (_super) {
+    __extends(Renderer, _super);
+    function Renderer() {
+        var _this = _super !== null && _super.apply(this, arguments) || this;
+        _this.width = 800;
+        _this.height = 600;
+        _this.items = [];
+        return _this;
+    }
+    return Renderer;
+}(Component));
+
+var Camera = /** @class */ (function (_super) {
+    __extends(Camera, _super);
+    function Camera() {
+        var _this = _super !== null && _super.apply(this, arguments) || this;
+        _this.perspective = true;
+        _this.aspect = 1;
+        _this.near = .1;
+        _this.far = 2000;
+        _this.fov = 50;
+        return _this;
+    }
+    return Camera;
+}(Component));
+var CameraAutoAspect = /** @class */ (function (_super) {
+    __extends(CameraAutoAspect, _super);
+    function CameraAutoAspect() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    return CameraAutoAspect;
+}(Component));
+
+var Scene = /** @class */ (function (_super) {
+    __extends(Scene, _super);
+    function Scene() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    return Scene;
+}(Component));
+var RootScene = /** @class */ (function (_super) {
+    __extends(RootScene, _super);
+    function RootScene() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    return RootScene;
 }(Component));
 
 var baseMatrix = new Matrix4$1.Matrix4();
@@ -3340,17 +3408,16 @@ var ContainerSystem = /** @class */ (function () {
             if (!castComponent(component, Container)) {
                 return;
             }
-            component.get('children').forEach(function (e) {
-                if (!e.hasComponent(Transform)) {
-                    return;
+            component.children.forEach(function (e) {
+                if (e.hasComponent(Transform)) {
+                    e.getComponent(Transform)._setWorldMatrix(baseMatrix);
                 }
-                e.getComponent(Transform)._setWorldMatrix(baseMatrix);
             });
         };
     }
     ContainerSystem.prototype.onAttach = function (engine) {
         var _this = this;
-        this.withChildren = engine.createFamily([Container, Transform]);
+        this.withChildren = engine.createFamily(Container, Transform);
         this.withChildren.getNews().forEach(function (e) { return e.on('removeComponent', _this.onRemoveComponent); });
     };
     ContainerSystem.prototype.execute = function (engine, delta) {
@@ -3359,30 +3426,80 @@ var ContainerSystem = /** @class */ (function () {
         this.withChildren.getRemoved().forEach(function (e) { return e.off('removeComponent', _this.onRemoveComponent); });
         this.withChildren.getEntities().forEach(function (e) {
             var transform = e.getComponent(Transform);
-            if (e.getComponent(Container).hasUpdate("children") ||
-                transform.hasUpdate("positionX") ||
-                transform.hasUpdate("positionY") ||
-                transform.hasUpdate("positionZ") ||
-                transform.hasUpdate("rotationX") ||
-                transform.hasUpdate("rotationY") ||
-                transform.hasUpdate("rotationZ") ||
-                transform.hasUpdate("scaleX") ||
-                transform.hasUpdate("scaleY") ||
-                transform.hasUpdate("scaleZ") ||
-                transform._matrixHasUpdates()) {
-                e.getComponent(Container).get('children').forEach(function (child) {
-                    if (!child.hasComponent(Transform)) {
-                        child.addComponent(Transform);
-                    }
-                    child.getComponent(Transform)._setWorldMatrix(transform._getMatrix());
-                });
+            if (e.getComponent(Container).hasUpdate("children") || transform._hasLocalUpdate()) {
+                _this.recursiveChangeTransform(e, transform);
+            }
+        });
+    };
+    ContainerSystem.prototype.recursiveChangeTransform = function (e, transform) {
+        var _this = this;
+        e.getComponent(Container).children.forEach(function (child) {
+            if (!child.hasComponent(Transform)) {
+                child.addComponent(Transform);
+            }
+            child.getComponent(Transform)._setWorldMatrix(transform._getMatrix());
+            if (child.hasComponent(Container)) {
+                _this.recursiveChangeTransform(child, child.getComponent(Transform));
             }
         });
     };
     return ContainerSystem;
 }());
 
+var SceneSystem = /** @class */ (function () {
+    function SceneSystem() {
+    }
+    SceneSystem.prototype.onAttach = function (engine) {
+        this.scenes = engine.createFamily(Scene, Not(RootScene));
+        this.containers = engine.createFamily(Container, RootScene);
+    };
+    SceneSystem.prototype.execute = function (engine, delta) {
+        this.scenes.getEntities().forEach(function (e) {
+            if (!e.hasComponent(RootScene)) {
+                e.addComponent(RootScene).set('scene', e.getComponent(Scene));
+            }
+        });
+        this.containers.getEntities().forEach(function (e) {
+            e.getComponent(Container).children.forEach(function (child) {
+                var root = e.getComponent(RootScene).scene;
+                if (!root) {
+                    return;
+                }
+                if (!child.hasComponent(RootScene)) {
+                    child.addComponent(RootScene).set('scene', root);
+                    return;
+                }
+                if (child.getComponent(RootScene).scene !== root) {
+                    child.getComponent(RootScene).set('scene', root);
+                }
+            });
+        });
+    };
+    return SceneSystem;
+}());
+
+var CameraAutoAspectSystem = /** @class */ (function () {
+    function CameraAutoAspectSystem() {
+    }
+    CameraAutoAspectSystem.prototype.onAttach = function (engine) {
+        this.renderers = engine.createFamily(Renderer);
+    };
+    CameraAutoAspectSystem.prototype.execute = function (engine, delta) {
+        this.renderers.getEntities().forEach(function (e) { return e.getComponent(Renderer).items.forEach((function (_a) {
+            var camera = _a.camera;
+            if (camera.getEntity().hasComponent(CameraAutoAspect)) {
+                camera.set('aspect', e.getComponent(Renderer).width / e.getComponent(Renderer).height);
+            }
+        })); });
+    };
+    return CameraAutoAspectSystem;
+}());
+
+exports.Camera = Camera;
+exports.CameraAutoAspect = CameraAutoAspect;
+exports.CameraAutoAspectSystem = CameraAutoAspectSystem;
 exports.Component = Component;
+exports.CompositeFamily = CompositeFamily;
 exports.Container = Container;
 exports.ContainerSystem = ContainerSystem;
 exports.Engine = Engine;
@@ -3390,6 +3507,9 @@ exports.Entity = Entity;
 exports.EventEmitter = EventEmitter;
 exports.Family = Family;
 exports.Not = Not;
-exports.TagComponent = TagComponent;
+exports.Renderer = Renderer;
+exports.RootScene = RootScene;
+exports.Scene = Scene;
+exports.SceneSystem = SceneSystem;
 exports.Transform = Transform;
 exports.castComponent = castComponent;
