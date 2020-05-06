@@ -1,12 +1,12 @@
-import {IEngine, IEntity, IFamily, ISystem} from "../Core/Contract";
+import {IEngine, IEntity, IFamily, ISystem} from "../Contract/Core";
 import {Container, Transform} from "../Components";
 import {Matrix4} from "three/src/math/Matrix4";
-import {castComponent} from "../Core/Helpers";
+import {castComponent, NullFamily} from "../Core/Helpers";
 
 const baseMatrix: Matrix4 = new Matrix4();
 
 export class ContainerSystem implements ISystem {
-  private withChildren: IFamily;
+  private withChildren: IFamily = NullFamily;
 
   onAttach(engine: IEngine): void {
     this.withChildren = engine.createFamily(Container, Transform);
@@ -25,7 +25,7 @@ export class ContainerSystem implements ISystem {
     });
   }
 
-  recursiveChangeTransform(e: IEntity, transform: Transform | Readonly<Transform>) {
+  private recursiveChangeTransform(e: IEntity, transform: Transform | Readonly<Transform>) {
     e.getComponent(Container).children.forEach(child => {
       if (!child.hasComponent(Transform)) {
         child.addComponent(Transform);

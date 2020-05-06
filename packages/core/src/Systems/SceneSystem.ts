@@ -1,10 +1,10 @@
-import {IEngine, IFamily, ISystem} from "../Core/Contract";
+import {IEngine, IEntity, IFamily, ISystem} from "../Contract/Core";
 import {Container, RootScene, Scene} from "../Components";
-import {Not} from "../Core/Helpers";
+import {Not, NullFamily} from "../Core/Helpers";
 
 export class SceneSystem implements ISystem {
-  private scenes: IFamily;
-  private containers: IFamily;
+  private scenes: IFamily = NullFamily;
+  private containers: IFamily = NullFamily;
 
   onAttach(engine: IEngine): void {
     this.scenes = engine.createFamily(Scene, Not(RootScene));
@@ -12,27 +12,34 @@ export class SceneSystem implements ISystem {
   }
 
   execute(engine: IEngine, delta: number): void {
-    this.scenes.getEntities().forEach(e => {
-      if (!e.hasComponent(RootScene)) {
-        e.addComponent(RootScene).set('scene', e.getComponent(Scene));
+    this.containers.getEntities().forEach(e => {
+      if (e.getComponent(Container).hasUpdate('children') && e.getComponent(RootScene).scene) {
+        this.setRootRecursive(e.getComponent(Container).children, e.getComponent(RootScene).scene!);
       }
     });
 
-    this.containers.getEntities().forEach(e => {
-      e.getComponent(Container).children.forEach(child => {
-        const root = e.getComponent(RootScene).scene;
-        if(!root){
-          return;
-        }
-        if (!child.hasComponent(RootScene)) {
-          child.addComponent(RootScene).set('scene', root);
-          return;
-        }
+    this.scenes.getEntities().forEach(e => {
+      if (!e.hasComponent(RootScene)) {
+        e.addComponent(RootScene).set('scene', e);
+      }
 
-        if (child.getComponent(RootScene).scene !== root) {
-          child.getComponent(RootScene).set('scene', root);
-        }
-      })
+      if (e.hasComponent(Container)) {
+        this.setRootRecursive(e.getComponent(Container).children, e);
+      }
+    });
+  }
+
+  private setRootRecursive(children: IEntity[], scene: IEntity) {
+    children.forEach(child => {
+      if (!child.hasComponent(RootScene)) {
+        child.addComponent(RootScene);
+      }
+
+      child.getComponent(RootScene).set('scene', scene);
+
+      if (child.hasComponent(Container)) {
+        this.setRootRecursive(child.getComponent(Container).children, scene);
+      }
     })
   }
 }

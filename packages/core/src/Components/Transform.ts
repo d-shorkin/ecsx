@@ -40,8 +40,8 @@ export class Transform extends Component {
 
   private worldTransform?: Transform;
 
-  private needsUpdateLocalMatrix: boolean = false;
-  private needsUpdateQuaternion: boolean = false;
+  private needsUpdateLocalMatrix: boolean = true;
+  private needsUpdateQuaternion: boolean = true;
   private worldMatrixUpdated: boolean = false;
 
   private worldMatrix: Matrix4 = new Matrix4();
@@ -137,7 +137,7 @@ export class Transform extends Component {
       this.worldData.rotation.setFromQuaternion(this.worldData.quaternion);
 
       if(!this.worldTransform){
-        this.worldTransform = new Transform()
+        this.worldTransform = new Transform();
       }
 
       this.worldTransform.positionX = this.worldData.position.x;

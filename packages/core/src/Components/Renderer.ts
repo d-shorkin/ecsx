@@ -1,10 +1,9 @@
 import {Component} from "../Core/Component";
-import {Scene} from "./Scene";
-import {Camera} from "./Camera";
+import {IEntity} from "../..";
 
 export interface RenderingItem {
-  scene: Readonly<Scene>;
-  camera: Readonly<Camera>;
+  scene: IEntity;
+  camera: IEntity;
 }
 
 export class Renderer extends Component {

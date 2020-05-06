@@ -3,11 +3,10 @@ import {
   EngineEvents, EntityUpdateEvent, IComponent,
   IEngine,
   IEntity,
-  IEntityCollection, IFamily,
-  IInitEntity,
+  IFamily,
   ILoopCounter,
   ISystem, NotComponent
-} from "./Contract";
+} from "../Contract/Core";
 import {EventEmitter} from "../Events/EventEmitter";
 import {Family} from "./Family";
 
@@ -31,7 +30,7 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine, ILoop
     return this.entities;
   }
 
-  addEntity(entity: IInitEntity): void {
+  addEntity(entity: IEntity): void {
     if (entity.getId()) {
       throw new Error("Entity id must be 0 for add to engine")
     }

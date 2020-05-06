@@ -1,4 +1,5 @@
-import {ComponentConstructor, IComponent, IEntity, IFamily, NotComponent} from "./Contract";
+import {ComponentConstructor, IComponent, IEntity, IFamily, NotComponent} from "../Contract/Core";
+import {IRepository, IRepositoryItem} from "../..";
 
 export function castComponent<T extends IComponent>(
   component: IComponent | undefined | null,
@@ -13,7 +14,8 @@ export function Not<T extends IComponent>(componentClass: ComponentConstructor<T
 
 export class CompositeFamily implements IFamily {
   private families: IFamily[];
-  constructor(...families: IFamily[]){
+
+  constructor(...families: IFamily[]) {
     this.families = families;
   }
 
@@ -28,4 +30,48 @@ export class CompositeFamily implements IFamily {
   getRemoved(): IEntity[] {
     return this.families.reduce((acc, f) => acc.concat(f.getRemoved()), [] as IEntity[]);
   }
+}
+
+
+export const NullFamily = new class implements IFamily {
+  getEntities(): IEntity[] {
+    return [];
+  }
+
+  getNews(): IEntity[] {
+    return [];
+  }
+
+  getRemoved(): IEntity[] {
+    return [];
+  }
+};
+
+export class CompositeRepository<T> implements IRepository<T> {
+  private repositories: IRepository<T>[];
+
+  constructor(...repositories: IRepository<T>[]){
+    this.repositories = repositories;
+  }
+
+  getAll(): IRepositoryItem<T>[] {
+    return this.repositories.reduce((acc, item) => {
+      return acc.concat(item.getAll());
+    }, [] as IRepositoryItem<T>[]);
+  }
+
+  getBy(entity: IEntity): T {
+    for (const r of this.repositories){
+      if(r.hasBy(entity)){
+        return r.getBy(entity);
+      }
+    }
+
+    throw new Error(`Object for ${entity.getId()} not found`)
+  }
+
+  hasBy(entity: IEntity): boolean {
+    return this.repositories.some(r => r.hasBy(entity));
+  }
+
 }

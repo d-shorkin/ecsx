@@ -1,4 +1,4 @@
-import {ComponentConstructor, IComponent, IEngine, IEntity, IFamily} from "./Contract";
+import {ComponentConstructor, IComponent, IEngine, IEntity, IFamily} from "../Contract/Core";
 
 export class Family implements IFamily {
   private engine: IEngine;

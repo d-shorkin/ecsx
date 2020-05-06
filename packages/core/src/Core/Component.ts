@@ -1,4 +1,4 @@
-import {IComponent, IEntity, ILoopCounter} from "./Contract";
+import {IComponent, IEntity, ILoopCounter} from "../Contract/Core";
 
 type UpdatesDates<T extends object> = {[K in keyof T]?: number}
 

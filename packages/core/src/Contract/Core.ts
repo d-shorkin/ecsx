@@ -1,4 +1,4 @@
-import {IEventEmitter} from "../Events/IEventEmitter";
+import {IEventEmitter} from "./Common";
 
 export interface ComponentConstructor<T extends IComponent> {
   readonly name: string;
@@ -45,7 +45,7 @@ export interface IComponent extends ILoopCounterChild {
   _setEntity(entity: IEntity): void;
 }
 
-export interface IEntity<A extends IComponent = IComponent> extends IEventEmitter<EntityEvents> {
+export interface IEntity<A extends IComponent = IComponent> extends IEventEmitter<EntityEvents>, ILoopCounterChild {
   getId(): number;
 
   listComponents(): IComponent[];
@@ -54,16 +54,14 @@ export interface IEntity<A extends IComponent = IComponent> extends IEventEmitte
 
   listComponentsWithTags(): { tag: string, component: IComponent }[];
 
-  hasComponent<T extends A>(componentClass: ComponentConstructor<T>): boolean;
+  hasComponent<T extends A>(componentClass: ComponentConstructor<T>, existsCallback?: (component: T) => void): boolean;
 
   getComponent<T extends A>(componentClass: ComponentConstructor<T>): Readonly<T>;
 
   addComponent<T extends A>(componentClass: ComponentConstructor<T>): Readonly<T>;
 
   removeComponent<T extends A>(componentClass: ComponentConstructor<T>): void;
-}
 
-export interface IInitEntity extends IEntity, ILoopCounterChild {
   _setId(id: number): void;
 }
 
@@ -84,7 +82,7 @@ export interface ISystem {
 }
 
 export interface IEngine extends IEventEmitter<EngineEvents>, IEntityCollection, IFamilyFactory {
-  addEntity(entity: IInitEntity): void;
+  addEntity(entity: IEntity): void;
 
   removeEntity(entity: IEntity): void;
 

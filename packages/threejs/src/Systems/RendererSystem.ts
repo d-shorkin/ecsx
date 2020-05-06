@@ -1,89 +1,47 @@
 import {
-  Camera,
-  castComponent, CompositeFamily,
-  EntityUpdateEvent,
   IEngine,
   IEntity,
-  IFamily,
-  ISystem, Not,
-  Renderer as CoreRenderer, Scene, Transform
+  IFamily, IRepository,
+  ISystem, NullFamily, Renderer,
+  Renderer as RendererComponent,
 } from "@ecsx/core";
-import {WebGLRendererParameters, Vector2} from "three";
-import {ThreeRenderer} from "../Components/ThreeRenderer";
-import {ThreeScene} from "../Components/ThreeScene";
-import {ThreeCamera} from "../Components/ThreeCamera";
+import {Renderer as IRenderer, Scene, Camera} from "three";
 
-const tmpVector2 = new Vector2();
 
 export class RendererSystem implements ISystem {
-  private options: WebGLRendererParameters;
+  private renderers: IFamily = NullFamily;
+  private renderersRepository: IRepository<IRenderer>;
+  private sceneRepository: IRepository<Scene>;
+  private cameraRepository: IRepository<Camera>;
 
-  private renderers: IFamily;
-  private cameras: IFamily;
-  private newObjects: IFamily;
-
-  constructor(options?: WebGLRendererParameters) {
-    this.options = {
-      antialias: true,
-      ...options
-    }
+  constructor(
+    renderersRepository: IRepository<IRenderer>,
+    sceneRepository: IRepository<Scene>,
+    cameraRepository: IRepository<Camera>
+  ) {
+    this.renderersRepository = renderersRepository;
+    this.sceneRepository = sceneRepository;
+    this.cameraRepository = cameraRepository;
   }
 
   onAttach(engine: IEngine): void {
-    this.newObjects = new CompositeFamily(
-      engine.createFamily(CoreRenderer, Not(ThreeRenderer)),
-      engine.createFamily(Scene, Not(ThreeScene)),
-      engine.createFamily(Camera, Not(ThreeCamera))
-    );
-
-    this.renderers = engine.createFamily(CoreRenderer, ThreeRenderer);
-    this.cameras = engine.createFamily(Camera, ThreeCamera);
+    this.renderers = engine.createFamily(Renderer);
   }
 
   execute(engine: IEngine, delta: number): void {
-    this.newObjects.getEntities().forEach(e => {
-      if(e.hasComponent(CoreRenderer)){
-        e.addComponent(ThreeRenderer);
-      }
-
-      if(e.hasComponent(Scene)){
-        e.addComponent(ThreeScene);
-      }
-
-      if(e.hasComponent(Camera)){
-        e.addComponent(ThreeCamera);
-      }
-    });
-    this.cameras.getEntities().forEach(e => {
-      const cam = e.getComponent(ThreeCamera).getCamera();
-      if (cam && e.hasComponent(Transform)) {
-        cam.position.x = e.getComponent(Transform).positionX;
-        cam.position.y = e.getComponent(Transform).positionY;
-        cam.position.z = e.getComponent(Transform).positionZ;
-        cam.rotation.x = e.getComponent(Transform).rotationX;
-        cam.rotation.y = e.getComponent(Transform).rotationY;
-        cam.rotation.z = e.getComponent(Transform).rotationZ;
-        cam.scale.x = e.getComponent(Transform).scaleX;
-        cam.scale.y = e.getComponent(Transform).scaleY;
-        cam.scale.z = e.getComponent(Transform).scaleZ;
-      }
-    });
     this.renderers.getEntities().forEach((entity: IEntity) => {
-      const renderer = entity.getComponent(ThreeRenderer).getRenderer();
-      if (!renderer) {
+      if (!this.renderersRepository.hasBy(entity)) {
         return;
       }
-      entity.getComponent(CoreRenderer).items.forEach(({camera, scene}) => {
-        if (!scene.getEntity().hasComponent(ThreeScene) || !camera.getEntity().hasComponent(ThreeCamera)) {
+
+      const renderer = this.renderersRepository.getBy(entity);
+
+      entity.getComponent(RendererComponent).items.forEach(({camera, scene}) => {
+        if(!this.cameraRepository.hasBy(camera) || !this.sceneRepository.hasBy(scene)){
           return;
         }
 
-        const threeScene = scene.getEntity().getComponent(ThreeScene).getScene();
-        const threeCamera = camera.getEntity().getComponent(ThreeCamera).getCamera();
-
-        if(threeScene && threeCamera){
-          renderer.render(threeScene, threeCamera);
-        }
+        renderer.render(this.sceneRepository.getBy(scene), this.cameraRepository.getBy(camera));
       });
     });
   }

@@ -1,4 +1,4 @@
-import {Arguments, IEventEmitter} from "./IEventEmitter";
+import {Arguments, IEventEmitter} from "../Contract/Common";
 
 type Listeners<T extends object> = {
   [K in keyof T]: T[K][];

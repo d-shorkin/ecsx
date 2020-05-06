@@ -1,8 +1,8 @@
-import {ComponentConstructor, EntityEvents, IComponent, IInitEntity, ILoopCounter} from "./Contract";
+import {ComponentConstructor, EntityEvents, IComponent, IEntity, ILoopCounter} from "../Contract/Core";
 import {castComponent} from "./Helpers";
 import {EventEmitter} from "../Events/EventEmitter";
 
-export class Entity extends EventEmitter<EntityEvents> implements IInitEntity {
+export class Entity extends EventEmitter<EntityEvents> implements IEntity {
   private readonly components: { [tag: string]: IComponent } = {};
   private readonly componentClasses: { [tag: string]: ComponentConstructor<IComponent> } = {};
   private id: number = 0;
@@ -32,21 +32,24 @@ export class Entity extends EventEmitter<EntityEvents> implements IInitEntity {
     );
   }
 
-  hasComponent<T extends IComponent>(componentClass: ComponentConstructor<T>) {
+  hasComponent<T extends IComponent>(componentClass: ComponentConstructor<T>, existsCallback?: (component: T) => void) {
     const tag = componentClass.tag || componentClass.name;
-    const component = this.components[tag];
+    const component = this.components[tag] as T;
     if (!component) return false;
     if (!castComponent(component, componentClass)) {
       throw new Error(
         `There are multiple classes with the same tag or name "${tag}".\nAdd a different property "tag" to one of them.`
       );
     }
+    if (existsCallback) {
+      existsCallback(component);
+    }
     return true;
   }
 
   getComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): Readonly<T> {
     const tag = componentClass.tag || componentClass.name;
-    const component = this.components[tag];
+    const component = this.components[tag] as T;
     if (!component) {
       throw new Error(`Cannot get component "${tag}" from entity.`);
     }
@@ -73,7 +76,7 @@ export class Entity extends EventEmitter<EntityEvents> implements IInitEntity {
       delete this.componentClasses[tag];
     }
 
-    if(!newComponent){
+    if (!newComponent) {
       newComponent = new componentClass();
     }
 

@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "strictNullChecks": true,
+    "allowSyntheticDefaultImports": true,
+    "declaration": false,
+    "outDir": "lib"
+  },
+  "references": [],
+  "include": [
+    "src"
+  ]
+}
