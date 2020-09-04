@@ -11,7 +11,19 @@ export interface TransformDataClear {
   quaternion: Quaternion;
 }
 
-export class Transform extends Component {
+export interface ITransformProperties {
+  positionX: number;
+  positionY: number;
+  positionZ: number;
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
+  scaleX: number;
+  scaleY: number;
+  scaleZ: number;
+}
+
+export class Transform extends Component implements ITransformProperties {
   static tag = 'core/transform';
 
   positionX: number = 0;
@@ -24,31 +36,7 @@ export class Transform extends Component {
   scaleY: number = 1;
   scaleZ: number = 1;
 
-  private clearData: TransformDataClear = {
-    position: new Vector3(),
-    rotation: new Euler(),
-    quaternion: new Quaternion(),
-    scale: new Vector3(1, 1, 1)
-  };
-
-  private worldData: TransformDataClear = {
-    position: new Vector3(),
-    rotation: new Euler(),
-    quaternion: new Quaternion(),
-    scale: new Vector3(1, 1, 1)
-  };
-
-  private worldTransform?: Transform;
-
-  private needsUpdateLocalMatrix: boolean = true;
-  private needsUpdateQuaternion: boolean = true;
-  private worldMatrixUpdated: boolean = false;
-
-  private worldMatrix: Matrix4 = new Matrix4();
-  private localMatrix: Matrix4 = new Matrix4();
-  private commonMatrix: Matrix4 = new Matrix4();
-
-  set<K extends keyof this>(key: K, data: this[K]): void {
+  /*set<K extends keyof this>(key: K, data: this[K]): void {
     let changed = false;
     switch (key) {
       case "positionX":
@@ -84,6 +72,8 @@ export class Transform extends Component {
       case "scaleZ":
         changed = this.setValuesHasChanges(this.clearData.scale, 'z', data);
         break;
+      default:
+        this.throwKeyError(key as string);
     }
 
     if (changed) {
@@ -104,21 +94,90 @@ export class Transform extends Component {
     return this.clearData.rotation;
   }
 
-  getWorld<K extends keyof Transform>(key: K): Transform[K] {
+  getWorld<K extends keyof ITransformProperties>(key: K): Transform[K] {
     this.updateMatrix();
-    if(this.worldTransform){
-      return this.worldTransform[key];
+    if (this.unitedTransform) {
+      return this.unitedTransform[key];
     }
     throw new Error('cannot find world transform')
   }
 
+  setWorld<K extends keyof ITransformProperties>(key: K, value: ITransformProperties[K]): void {
+    this.updateWorldInverseMatrix();
+
+    switch (key) {
+      case "rotationX":
+        if(!this.compareChange(this.unitedTransform, 'positionX', value)) return;
+        this.unitedData.rotation.x = value;
+        this.unitedData.quaternion.setFromEuler(this.unitedData.rotation);
+        break;
+      case "rotationY":
+        if(!this.compareChange(this.unitedTransform, 'rotationY', value)) return;
+        this.unitedData.rotation.y = value;
+        this.unitedData.quaternion.setFromEuler(this.unitedData.rotation);
+        break;
+      case "rotationZ":
+        if(!this.compareChange(this.unitedTransform, 'rotationZ', value)) return;
+        this.unitedData.rotation.z = value;
+        this.unitedData.quaternion.setFromEuler(this.unitedData.rotation);
+        break;
+      case "positionX":
+        if(!this.compareChange(this.unitedTransform, 'positionX', value)) return;
+        this.unitedData.position.x = value;
+        break;
+      case "positionY":
+        if(!this.compareChange(this.unitedTransform, 'positionY', value)) return;
+        this.unitedData.position.y = value;
+        break;
+      case "positionZ":
+        if(!this.compareChange(this.unitedTransform, 'positionZ', value)) return;
+        this.unitedData.position.z = value;
+        break;
+      case "scaleX":
+        if(!this.compareChange(this.unitedTransform, 'scaleX', value)) return;
+        this.unitedData.scale.x = value;
+        break;
+      case "scaleY":
+        if(!this.compareChange(this.unitedTransform, 'scaleY', value)) return;
+        this.unitedData.scale.y = value;
+        break;
+      case "scaleZ":
+        if(!this.compareChange(this.unitedTransform, 'scaleZ', value)) return;
+        this.unitedData.scale.z = value;
+        break;
+      default:
+        this.throwKeyError(key);
+    }
+
+    this.unitedMatrix.compose(this.unitedData.position, this.unitedData.quaternion, this.unitedData.scale);
+
+    this.localMatrix.multiplyMatrices(this.unitedMatrix, this.inverseWorldMatrix);
+    this.localMatrix.decompose(this.clearData.position, this.clearData.quaternion, this.clearData.scale);
+    this.clearData.rotation.setFromQuaternion(this.clearData.quaternion);
+
+    this.positionX = this.clearData.position.x;
+    this.positionY = this.clearData.position.y;
+    this.positionZ = this.clearData.position.z;
+    this.rotationX = this.clearData.rotation.x;
+    this.rotationY = this.clearData.rotation.y;
+    this.rotationZ = this.clearData.rotation.z;
+    this.scaleX = this.clearData.scale.x;
+    this.scaleY = this.clearData.scale.y;
+    this.scaleZ = this.clearData.scale.z;
+
+    this.unitedMatrixUpdated = true;
+
+
+    // TODO: set update flag to true
+  }
+
   _hasLocalUpdate(): boolean {
-    return this.needsUpdateLocalMatrix;
+    return this.needsUpdateLocalMatrix || this.unitedMatrixUpdated;
   }
 
   _getMatrix(): Matrix4 {
     this.updateMatrix();
-    return this.commonMatrix;
+    return this.unitedMatrix;
   }
 
   _setWorldMatrix(matrix: Matrix4): void {
@@ -131,24 +190,22 @@ export class Transform extends Component {
       this.localMatrix.compose(this.clearData.position, this.getQuaternion(), this.clearData.scale);
     }
 
-    if (this._hasLocalUpdate() || this.worldMatrixUpdated) {
-      this.commonMatrix.identity().multiplyMatrices(this.worldMatrix, this.localMatrix);
-      this.commonMatrix.decompose(this.worldData.position, this.worldData.quaternion, this.worldData.scale);
-      this.worldData.rotation.setFromQuaternion(this.worldData.quaternion);
+    if (this.needsUpdateLocalMatrix || this.worldMatrixUpdated) {
+      this.unitedMatrix.identity().multiplyMatrices(this.worldMatrix, this.localMatrix);
+      this.unitedMatrix.decompose(this.unitedData.position, this.unitedData.quaternion, this.unitedData.scale);
+      this.unitedData.rotation.setFromQuaternion(this.unitedData.quaternion);
 
-      if(!this.worldTransform){
-        this.worldTransform = new Transform();
-      }
+      this.unitedTransform.positionX = this.unitedData.position.x;
+      this.unitedTransform.positionY = this.unitedData.position.y;
+      this.unitedTransform.positionZ = this.unitedData.position.z;
+      this.unitedTransform.rotationX = this.unitedData.rotation.x;
+      this.unitedTransform.rotationY = this.unitedData.rotation.y;
+      this.unitedTransform.rotationZ = this.unitedData.rotation.z;
+      this.unitedTransform.scaleX = this.unitedData.scale.x;
+      this.unitedTransform.scaleY = this.unitedData.scale.y;
+      this.unitedTransform.scaleZ = this.unitedData.scale.z;
 
-      this.worldTransform.positionX = this.worldData.position.x;
-      this.worldTransform.positionY = this.worldData.position.y;
-      this.worldTransform.positionZ = this.worldData.position.z;
-      this.worldTransform.rotationX = this.worldData.rotation.x;
-      this.worldTransform.rotationY = this.worldData.rotation.y;
-      this.worldTransform.rotationZ = this.worldData.rotation.z;
-      this.worldTransform.scaleX = this.worldData.scale.x;
-      this.worldTransform.scaleY = this.worldData.scale.y;
-      this.worldTransform.scaleZ = this.worldData.scale.z;
+      this.needsUpdateWorldInverseMatrix = true;
     }
 
     this.needsUpdateLocalMatrix = false;
@@ -162,4 +219,30 @@ export class Transform extends Component {
     }
     return false;
   }
+
+  private updateWorldInverseMatrix() {
+    this.updateMatrix();
+    if (this.needsUpdateWorldInverseMatrix) {
+      this.inverseWorldMatrix.getInverse(this.worldMatrix);
+    }
+  }
+
+  private throwKeyError(key: string): void {
+    const keys = Object.keys(this.unitedTransform).map(k => `"${k}"`).join(', ');
+    throw new Error(`Wrong key ${key} for transform you can use only ${keys} for transform`);
+  }
+
+  private compareChange<T extends object, K extends keyof T>(object: T, key: K, value: T[K]): boolean {
+    if(object[key] !== value){
+      object[key] = value;
+      return true
+    }
+
+    return false;
+  }
+  */
+}
+
+export class WorldTransform extends Transform {
+
 }

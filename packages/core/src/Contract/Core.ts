@@ -36,9 +36,7 @@ export interface IComponent extends ILoopCounterChild {
 
   set<K extends keyof this>(key: K, data: this[K]): void;
 
-  hasUpdate<K extends keyof this>(key: K): boolean;
-
-  hasAnyUpdates(...keys: Array<keyof this>): boolean;
+  hasUpdate<K extends keyof this>(...keys: K[]): boolean;
 
   destroy(): void;
 

@@ -15,7 +15,7 @@
     "@rollup/plugin-node-resolve": "^7.1.1",
     "@types/matter-js": "^0.14.2",
     "rollup": "^2.3.4",
-    "rollup-plugin-typescript2": "^0.27.0",
+    "rollup-plugin-typescript": "^1.0.1",
     "tslib": "^1.11.1",
     "typescript": "^3.8.3"
   },
@@ -32,6 +32,7 @@
   "dependencies": {
     "@ecsx/core": "*",
     "matter-js": "^0.14.2",
-    "poly-decomp": "^0.3.0"
+    "poly-decomp": "^0.3.0",
+    "pixi.js": "*"
   }
 }

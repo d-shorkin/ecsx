@@ -423,19 +423,18 @@ var Component = /** @class */ (function () {
         this.updates = {};
         this.counter = null;
     }
-    Component.prototype.hasUpdate = function (key) {
-        if (!this.counter || this.createdAt >= this.counter.getLast()) {
-            return true;
-        }
-        return !!this.updates[key] && this.updates[key] >= this.counter.getLast();
-    };
-    Component.prototype.hasAnyUpdates = function () {
+    Component.prototype.hasUpdate = function () {
         var _this = this;
         var keys = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             keys[_i] = arguments[_i];
         }
-        return keys.some(function (k) { return _this.hasUpdate(k); });
+        return keys.some(function (key) {
+            if (!_this.counter || _this.createdAt >= _this.counter.getLast()) {
+                return true;
+            }
+            return !!_this.updates[key] && _this.updates[key] >= _this.counter.getLast();
+        });
     };
     Component.prototype.getEntity = function () {
         return this.entity;
@@ -448,10 +447,12 @@ var Component = /** @class */ (function () {
         this.entity = entity;
     };
     Component.prototype.set = function (key, data) {
-        if (this.counter) {
-            this.updates[key] = this.counter.getCurrent();
+        if (this[key] !== data) {
+            this[key] = data;
+            if (this.counter) {
+                this.updates[key] = this.counter.getCurrent();
+            }
         }
-        this[key] = data;
     };
     Component.prototype.destroy = function () {
         // may be overwrite by extends class
@@ -3316,18 +3317,33 @@ var Transform = /** @class */ (function (_super) {
             quaternion: new Quaternion(),
             scale: new Vector3(1, 1, 1)
         };
-        _this.worldData = {
+        _this.unitedData = {
             position: new Vector3(),
             rotation: new Euler(),
             quaternion: new Quaternion(),
             scale: new Vector3(1, 1, 1)
         };
+        _this.unitedTransform = {
+            positionX: 0,
+            positionY: 0,
+            positionZ: 0,
+            rotationX: 0,
+            rotationY: 0,
+            rotationZ: 0,
+            scaleX: 1,
+            scaleY: 1,
+            scaleZ: 1,
+        };
         _this.needsUpdateLocalMatrix = true;
         _this.needsUpdateQuaternion = true;
+        _this.needsUpdateWorldInverseMatrix = true;
         _this.worldMatrixUpdated = false;
+        _this.unitedMatrixUpdated = false;
         _this.worldMatrix = new Matrix4$2.Matrix4();
         _this.localMatrix = new Matrix4$2.Matrix4();
-        _this.commonMatrix = new Matrix4$2.Matrix4();
+        _this.inverseWorldMatrix = new Matrix4$2.Matrix4();
+        _this.unitedMatrix = new Matrix4$2.Matrix4();
+        _this.tempMatrix = new Matrix4$2.Matrix4();
         return _this;
     }
     Transform.prototype.set = function (key, data) {
@@ -3366,6 +3382,8 @@ var Transform = /** @class */ (function (_super) {
             case "scaleZ":
                 changed = this.setValuesHasChanges(this.clearData.scale, 'z', data);
                 break;
+            default:
+                this.throwKeyError(key);
         }
         if (changed) {
             this.needsUpdateLocalMatrix = true;
@@ -3384,17 +3402,87 @@ var Transform = /** @class */ (function (_super) {
     };
     Transform.prototype.getWorld = function (key) {
         this.updateMatrix();
-        if (this.worldTransform) {
-            return this.worldTransform[key];
+        if (this.unitedTransform) {
+            return this.unitedTransform[key];
         }
         throw new Error('cannot find world transform');
     };
+    Transform.prototype.setWorld = function (key, value) {
+        this.updateWorldInverseMatrix();
+        switch (key) {
+            case "rotationX":
+                if (!this.compareChange(this.unitedTransform, 'positionX', value))
+                    return;
+                this.unitedData.rotation.x = value;
+                this.unitedData.quaternion.setFromEuler(this.unitedData.rotation);
+                break;
+            case "rotationY":
+                if (!this.compareChange(this.unitedTransform, 'rotationY', value))
+                    return;
+                this.unitedData.rotation.y = value;
+                this.unitedData.quaternion.setFromEuler(this.unitedData.rotation);
+                break;
+            case "rotationZ":
+                if (!this.compareChange(this.unitedTransform, 'rotationZ', value))
+                    return;
+                this.unitedData.rotation.z = value;
+                this.unitedData.quaternion.setFromEuler(this.unitedData.rotation);
+                break;
+            case "positionX":
+                if (!this.compareChange(this.unitedTransform, 'positionX', value))
+                    return;
+                this.unitedData.position.x = value;
+                break;
+            case "positionY":
+                if (!this.compareChange(this.unitedTransform, 'positionY', value))
+                    return;
+                this.unitedData.position.y = value;
+                break;
+            case "positionZ":
+                if (!this.compareChange(this.unitedTransform, 'positionZ', value))
+                    return;
+                this.unitedData.position.z = value;
+                break;
+            case "scaleX":
+                if (!this.compareChange(this.unitedTransform, 'scaleX', value))
+                    return;
+                this.unitedData.scale.x = value;
+                break;
+            case "scaleY":
+                if (!this.compareChange(this.unitedTransform, 'scaleY', value))
+                    return;
+                this.unitedData.scale.y = value;
+                break;
+            case "scaleZ":
+                if (!this.compareChange(this.unitedTransform, 'scaleZ', value))
+                    return;
+                this.unitedData.scale.z = value;
+                break;
+            default:
+                this.throwKeyError(key);
+        }
+        this.unitedMatrix.compose(this.unitedData.position, this.unitedData.quaternion, this.unitedData.scale);
+        this.localMatrix.multiplyMatrices(this.unitedMatrix, this.inverseWorldMatrix);
+        this.localMatrix.decompose(this.clearData.position, this.clearData.quaternion, this.clearData.scale);
+        this.clearData.rotation.setFromQuaternion(this.clearData.quaternion);
+        this.positionX = this.clearData.position.x;
+        this.positionY = this.clearData.position.y;
+        this.positionZ = this.clearData.position.z;
+        this.rotationX = this.clearData.rotation.x;
+        this.rotationY = this.clearData.rotation.y;
+        this.rotationZ = this.clearData.rotation.z;
+        this.scaleX = this.clearData.scale.x;
+        this.scaleY = this.clearData.scale.y;
+        this.scaleZ = this.clearData.scale.z;
+        this.unitedMatrixUpdated = true;
+        // TODO: set update flag to true
+    };
     Transform.prototype._hasLocalUpdate = function () {
-        return this.needsUpdateLocalMatrix;
+        return this.needsUpdateLocalMatrix || this.unitedMatrixUpdated;
     };
     Transform.prototype._getMatrix = function () {
         this.updateMatrix();
-        return this.commonMatrix;
+        return this.unitedMatrix;
     };
     Transform.prototype._setWorldMatrix = function (matrix) {
         this.worldMatrix.copy(matrix);
@@ -3404,22 +3492,20 @@ var Transform = /** @class */ (function (_super) {
         if (this.needsUpdateLocalMatrix) {
             this.localMatrix.compose(this.clearData.position, this.getQuaternion(), this.clearData.scale);
         }
-        if (this._hasLocalUpdate() || this.worldMatrixUpdated) {
-            this.commonMatrix.identity().multiplyMatrices(this.worldMatrix, this.localMatrix);
-            this.commonMatrix.decompose(this.worldData.position, this.worldData.quaternion, this.worldData.scale);
-            this.worldData.rotation.setFromQuaternion(this.worldData.quaternion);
-            if (!this.worldTransform) {
-                this.worldTransform = new Transform();
-            }
-            this.worldTransform.positionX = this.worldData.position.x;
-            this.worldTransform.positionY = this.worldData.position.y;
-            this.worldTransform.positionZ = this.worldData.position.z;
-            this.worldTransform.rotationX = this.worldData.rotation.x;
-            this.worldTransform.rotationY = this.worldData.rotation.y;
-            this.worldTransform.rotationZ = this.worldData.rotation.z;
-            this.worldTransform.scaleX = this.worldData.scale.x;
-            this.worldTransform.scaleY = this.worldData.scale.y;
-            this.worldTransform.scaleZ = this.worldData.scale.z;
+        if (this.needsUpdateLocalMatrix || this.worldMatrixUpdated) {
+            this.unitedMatrix.identity().multiplyMatrices(this.worldMatrix, this.localMatrix);
+            this.unitedMatrix.decompose(this.unitedData.position, this.unitedData.quaternion, this.unitedData.scale);
+            this.unitedData.rotation.setFromQuaternion(this.unitedData.quaternion);
+            this.unitedTransform.positionX = this.unitedData.position.x;
+            this.unitedTransform.positionY = this.unitedData.position.y;
+            this.unitedTransform.positionZ = this.unitedData.position.z;
+            this.unitedTransform.rotationX = this.unitedData.rotation.x;
+            this.unitedTransform.rotationY = this.unitedData.rotation.y;
+            this.unitedTransform.rotationZ = this.unitedData.rotation.z;
+            this.unitedTransform.scaleX = this.unitedData.scale.x;
+            this.unitedTransform.scaleY = this.unitedData.scale.y;
+            this.unitedTransform.scaleZ = this.unitedData.scale.z;
+            this.needsUpdateWorldInverseMatrix = true;
         }
         this.needsUpdateLocalMatrix = false;
         this.worldMatrixUpdated = false;
@@ -3427,6 +3513,23 @@ var Transform = /** @class */ (function (_super) {
     Transform.prototype.setValuesHasChanges = function (obj, key, value) {
         if (obj[key] !== value) {
             obj[key] = value;
+            return true;
+        }
+        return false;
+    };
+    Transform.prototype.updateWorldInverseMatrix = function () {
+        this.updateMatrix();
+        if (this.needsUpdateWorldInverseMatrix) {
+            this.inverseWorldMatrix.getInverse(this.worldMatrix);
+        }
+    };
+    Transform.prototype.throwKeyError = function (key) {
+        var keys = Object.keys(this.unitedTransform).map(function (k) { return "\"" + k + "\""; }).join(', ');
+        throw new Error("Wrong key " + key + " for transform you can use only " + keys + " for transform");
+    };
+    Transform.prototype.compareChange = function (object, key, value) {
+        if (object[key] !== value) {
+            object[key] = value;
             return true;
         }
         return false;
@@ -52737,6 +52840,24 @@ var Collider2d = /** @class */ (function (_super) {
     return Collider2d;
 }(Component));
 
+var RigidBody = /** @class */ (function (_super) {
+    __extends(RigidBody, _super);
+    function RigidBody() {
+        var _this = _super !== null && _super.apply(this, arguments) || this;
+        _this.isStatic = false;
+        return _this;
+    }
+    return RigidBody;
+}(Component));
+
+var Parent = /** @class */ (function (_super) {
+    __extends(Parent, _super);
+    function Parent() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    return Parent;
+}(Component));
+
 var baseMatrix = new Matrix4$2.Matrix4();
 var ContainerSystem = /** @class */ (function () {
     function ContainerSystem() {
@@ -52908,7 +53029,9 @@ exports.EventEmitter = EventEmitter;
 exports.Family = Family;
 exports.Not = Not;
 exports.NullFamily = NullFamily;
+exports.Parent = Parent;
 exports.Renderer = Renderer;
+exports.RigidBody = RigidBody;
 exports.RootScene = RootScene;
 exports.Scene = Scene;
 exports.SceneSystem = SceneSystem;

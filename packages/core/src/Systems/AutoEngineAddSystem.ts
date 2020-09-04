@@ -1,6 +1,6 @@
 import {IEngine, IEntity, IFamily, ISystem} from "../Contract/Core";
 import {Container} from "../Components";
-import {NullFamily} from "../..";
+import {NullFamily} from "../Core/Helpers";
 
 export class AutoEngineAddSystem implements ISystem {
   private entities: IFamily = NullFamily;

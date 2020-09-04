@@ -52,7 +52,7 @@ export class MatterPolygonFactory {
     });
   }
 
-  private decompVerticles(vertices: Matter.Vector[]): Matter.Vector[][] {
+  decompVerticles(vertices: Matter.Vector[]): Matter.Vector[][] {
     let concave = vertices.map(function (vertex) {
       return [vertex.x, vertex.y];
     });

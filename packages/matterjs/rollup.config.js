@@ -1,6 +1,5 @@
 import pkg from './package.json';
-import typescript from 'rollup-plugin-typescript2';
-import resolve from '@rollup/plugin-node-resolve';
+import typescript from 'rollup-plugin-typescript';
 
 export default {
   input: 'src/main.ts',
@@ -9,8 +8,6 @@ export default {
     format: 'cjs'
   },
   plugins: [
-    typescript(),
-    resolve()
-  ],
-  external: [ 'three/src/math/Matrix4' ]
+    typescript()
+  ]
 };

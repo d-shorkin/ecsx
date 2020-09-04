@@ -8,15 +8,13 @@ export abstract class Component implements IComponent {
   private counter: ILoopCounter | null = null;
   private entity: IEntity;
 
-  hasUpdate<K extends keyof this>(key: K): boolean {
-    if (!this.counter || this.createdAt >= this.counter.getLast()) {
-      return true;
-    }
-    return !!this.updates[key] && this.updates[key] >= this.counter.getLast();
-  }
-
-  hasAnyUpdates(...keys: Array<keyof this>): boolean {
-    return keys.some(k => this.hasUpdate(k));
+  hasUpdate<K extends keyof this>(...keys: K[]): boolean {
+    return keys.some(key => {
+      if (!this.counter || this.createdAt >= this.counter.getLast()) {
+        return true;
+      }
+      return !!this.updates[key] && this.updates[key] >= this.counter.getLast();
+    });
   }
 
   getEntity(): IEntity {
@@ -33,10 +31,12 @@ export abstract class Component implements IComponent {
   }
 
   set<K extends keyof this>(key: K, data: this[K]): void {
-    if (this.counter) {
-      this.updates[key] = this.counter.getCurrent();
+    if (this[key] !== data) {
+      this[key] = data;
+      if (this.counter) {
+        this.updates[key] = this.counter.getCurrent();
+      }
     }
-    this[key] = data;
   }
 
   destroy(): void {
