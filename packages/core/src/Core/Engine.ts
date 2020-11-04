@@ -2,9 +2,7 @@ import {
   ComponentConstructor,
   EngineEvents, EntityUpdateEvent, IComponent,
   IEngine,
-  IEntity,
-  IFamily,
-  ILoopCounter,
+  IEntity, IEntityCollection,
   ISystem, NotComponent
 } from "../Contract/Core";
 import {EventEmitter} from "../Events/EventEmitter";
@@ -15,12 +13,11 @@ type SystemWithLoopCounter = {
   system: ISystem
 };
 
-type Families = { [p: string]: IFamily };
+type Families = { [p: string]: IEntityCollection };
 
-export class Engine extends EventEmitter<EngineEvents> implements IEngine, ILoopCounter {
+export class Engine extends EventEmitter<EngineEvents> implements IEngine {
   private entities: IEntity[] = [];
   private systems: SystemWithLoopCounter[] = [];
-  private nextId: number = 0;
   private families: Families = {};
 
   private currentLoop: number = 1;
@@ -34,8 +31,6 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine, ILoop
     if (entity.getId()) {
       throw new Error("Entity id must be 0 for add to engine")
     }
-    entity._setId(++this.nextId);
-    entity._setLoopCounter(this);
     this.entities.push(entity);
     this.emit("entityAdded", entity);
     entity.on("putComponent", this.onEntityUpdate);
@@ -83,7 +78,7 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine, ILoop
     return this.lastLoop;
   }
 
-  createFamily(...components: (ComponentConstructor<IComponent> | NotComponent<IComponent>)[]): IFamily {
+  createFamily(...components: (ComponentConstructor<IComponent> | NotComponent<IComponent>)[]): IEntityCollection {
     let key = '';
 
     const include: ComponentConstructor<IComponent>[] = [];

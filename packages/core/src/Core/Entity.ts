@@ -1,12 +1,18 @@
-import {ComponentConstructor, EntityEvents, IComponent, IEntity, ILoopCounter} from "../Contract/Core";
+import {ComponentConstructor, EntityEvents, IComponent, IEntity} from "../Contract/Core";
 import {castComponent} from "./Helpers";
 import {EventEmitter} from "../Events/EventEmitter";
+
+let nextEntityId = 1;
 
 export class Entity extends EventEmitter<EntityEvents> implements IEntity {
   private readonly components: { [tag: string]: IComponent } = {};
   private readonly componentClasses: { [tag: string]: ComponentConstructor<IComponent> } = {};
-  private id: number = 0;
-  private counter: ILoopCounter;
+  private readonly id: number = 0;
+
+  constructor(){
+    super();
+    this.id = nextEntityId++;
+  }
 
   getId(): number {
     return this.id;
@@ -70,8 +76,6 @@ export class Entity extends EventEmitter<EntityEvents> implements IEntity {
           `There are multiple classes with the same tag or name "${tag}".\nAdd a different property "tag" to one of them.`
         );
       }
-
-      component.destroy();
       delete this.components[tag];
       delete this.componentClasses[tag];
     }
@@ -80,7 +84,6 @@ export class Entity extends EventEmitter<EntityEvents> implements IEntity {
       newComponent = new componentClass();
     }
 
-    newComponent._setEntity(this);
     this.components[tag] = newComponent;
     this.componentClasses[tag] = componentClass;
     this.emit("putComponent", {componentClass, tag, component, entity: this});
@@ -100,18 +103,5 @@ export class Entity extends EventEmitter<EntityEvents> implements IEntity {
     }
     delete this.components[tag];
     this.emit("removeComponent", {componentClass, tag, component, entity: this});
-    component.destroy();
-  }
-
-  _setId(id: number) {
-    if (this.id) {
-      throw new Error('Cannot set id one more time');
-    }
-    this.id = id;
-  }
-
-  _setLoopCounter(counter: ILoopCounter): void {
-    this.counter = counter;
-    Object.values(this.components).forEach(c => c._setLoopCounter(counter));
   }
 }

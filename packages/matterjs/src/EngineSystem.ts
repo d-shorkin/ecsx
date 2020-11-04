@@ -1,32 +1,18 @@
-import {IEngine, IFamily, IRepository, ISystem, NullFamily, IEntity, Container, Transform} from "@ecsx/core";
-import Matter, {Body, Engine} from "matter-js";
-import {Engine as EngineComponent} from "../Components/Engine";
-import {RootEngine} from "../Components/RootEngine";
-import {MatterBodyWrapper} from "../Comparators/BodyComparator";
+import {IEngine, ISystem} from "@ecsx/core";
+import Matter from "matter-js";
 
 export class EngineSystem implements ISystem {
-  private engineRepository: IRepository<Engine>;
-  private entities: IFamily = NullFamily;
-  private containers: IFamily = NullFamily;
-  private bodiesRepository: IRepository<MatterBodyWrapper>;
+  private matter: Matter.Engine;
 
-  constructor(engineRepository: IRepository<Engine>, bodiesRepository: IRepository<MatterBodyWrapper>) {
-    this.engineRepository = engineRepository;
-    this.bodiesRepository = bodiesRepository;
+  constructor(matter: Matter.Engine) {
+    this.matter = matter;
   }
 
   onAttach(engine: IEngine): void {
-    this.entities = engine.createFamily(EngineComponent);
-    this.containers = engine.createFamily(Container, RootEngine);
+
   }
 
   execute(engine: IEngine, delta: number): void {
-    this.containers.getEntities().forEach(e => {
-      if (e.getComponent(Container).hasUpdate('children') && e.getComponent(RootEngine).engine) {
-        this.setRootRecursive(e.getComponent(Container).children, e.getComponent(RootEngine).engine!);
-      }
-    });
-
     this.entities.getEntities().forEach(e => {
       if (!e.hasComponent(RootEngine)) {
         e.addComponent(RootEngine).set('engine', e);

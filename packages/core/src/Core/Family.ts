@@ -1,13 +1,11 @@
-import {ComponentConstructor, IComponent, IEngine, IEntity, IFamily} from "../Contract/Core";
+import {ComponentConstructor, IComponent, IEngine, IEntity, IEntityCollection} from "../Contract/Core";
 
-export class Family implements IFamily {
+export class Family implements IEntityCollection {
   private engine: IEngine;
   private included: ComponentConstructor<IComponent>[];
   private excluded: ComponentConstructor<IComponent>[];
 
-  private entities: IEntity[] = [];
-  private news: IEntity[] = [];
-  private removed: IEntity[] = [];
+  private readonly entities: IEntity[] = [];
 
   constructor(engine: IEngine, included: ComponentConstructor<IComponent>[], excluded: ComponentConstructor<IComponent>[]) {
     this.engine = engine;
@@ -17,7 +15,6 @@ export class Family implements IFamily {
     this.engine.on("entityAdded", (entity) => {
       if (this.isIncludedEntity(entity)) {
         this.entities.push(entity);
-        this.news.push(entity);
       }
     });
 
@@ -28,7 +25,6 @@ export class Family implements IFamily {
       }
 
       this.entities.splice(index, 1);
-      this.removed.push(entity);
     });
 
     this.engine.on("entityUpdated", (entity) => {
@@ -36,33 +32,17 @@ export class Family implements IFamily {
       if (index !== -1) {
         if (!this.isIncludedEntity(entity)) {
           this.entities.splice(index, 1);
-          this.removed.push(entity);
         }
       } else if (this.isIncludedEntity(entity)) {
         this.entities.push(entity);
-        this.news.push(entity);
       }
     });
 
-    engine.on("afterUpdate", () => {
-      this.news = [];
-      this.removed = [];
-    });
-
     this.entities = this.engine.getEntities().filter(this.isIncludedEntity.bind(this));
-    this.news = [...this.entities];
   }
 
   getEntities(): IEntity[] {
     return this.entities;
-  }
-
-  getNews(): IEntity[] {
-    return this.news;
-  }
-
-  getRemoved(): IEntity[] {
-    return this.removed;
   }
 
   private isIncludedEntity(entity: IEntity): boolean {

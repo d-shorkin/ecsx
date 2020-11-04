@@ -27,23 +27,16 @@ export type EngineEvents = {
   afterUpdate: (engine: IEngine) => void;
 };
 
+export type ComponentFilter = Array<ComponentConstructor<IComponent> | NotComponent<IComponent>>;
+
 export interface NotComponent<T extends IComponent> {
   not: ComponentConstructor<T>
 }
 
-export interface IComponent extends ILoopCounterChild {
-  getEntity(): IEntity;
-
-  set<K extends keyof this>(key: K, data: this[K]): void;
-
-  hasUpdate<K extends keyof this>(...keys: K[]): boolean;
-
-  destroy(): void;
-
-  _setEntity(entity: IEntity): void;
+export interface IComponent {
 }
 
-export interface IEntity<A extends IComponent = IComponent> extends IEventEmitter<EntityEvents>, ILoopCounterChild {
+export interface IEntity<A extends IComponent = IComponent> extends IEventEmitter<EntityEvents> {
   getId(): number;
 
   listComponents(): IComponent[];
@@ -59,18 +52,6 @@ export interface IEntity<A extends IComponent = IComponent> extends IEventEmitte
   addComponent<T extends A>(componentClass: ComponentConstructor<T>): Readonly<T>;
 
   removeComponent<T extends A>(componentClass: ComponentConstructor<T>): void;
-
-  _setId(id: number): void;
-}
-
-export interface ILoopCounterChild {
-  _setLoopCounter(counter: ILoopCounter): void;
-}
-
-export interface ILoopCounter {
-  getCurrent(): number;
-
-  getLast(): number;
 }
 
 export interface ISystem {
@@ -95,12 +76,6 @@ export interface IEntityCollection {
   getEntities(): IEntity[];
 }
 
-export interface IFamily extends IEntityCollection {
-  getRemoved(): IEntity[];
-
-  getNews(): IEntity[]
-}
-
 export interface IFamilyFactory {
-  createFamily(...components: Array<ComponentConstructor<IComponent> | NotComponent<IComponent>>): IFamily;
+  createFamily(...components: ComponentFilter): IEntityCollection;
 }
