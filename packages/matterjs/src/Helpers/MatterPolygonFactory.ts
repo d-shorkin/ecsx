@@ -13,23 +13,6 @@ export class MatterPolygonFactory {
     this.options = options;
   }
 
-  createFromStringPath(path: string): Matter.Body {
-    return this.createFromPath(path.split(' ').map(Number))
-  }
-
-  createFromPath(path: number[]): Matter.Body {
-    const vertices = path.reduce((acc, num, i) => {
-      if (!(i % 2)) {
-        acc.push(Matter.Vector.create(num, 0));
-      } else {
-        acc[acc.length - 1].y = num;
-      }
-      return acc;
-    }, [] as Matter.Vector[]);
-
-    return this.createfromVerticles(vertices);
-  }
-
   createfromVerticles(vertices: Matter.Vector[]): Matter.Body {
     if (vertices.length < 3) {
       throw new Error('Cannot create polygon using less 3 point')
