@@ -1,133 +1,133 @@
+import {Engine} from "@ecsx/core";
+import * as THREE from 'three';
+import {Camera, Object3D, ParentObject3D, Renderer, RendererSystem, Scene} from "@ecsx/threejs";
+import {ShipRendererSystem} from "./systems/ShipRendererSystem";
 import {
-  Camera,
-  Container,
-  ContainerSystem,
-  Engine,
-  Entity,
-  Renderer,
-  Scene,
-  Transform,
-  SceneSystem,
-  CameraAutoAspect, CameraAutoAspectSystem, Collider2d, CompareSystem, CompositeRepository,
-  AutoEngineAddSystem, RigidBody
-} from "@ecsx/core";
-import {
-  RendererSystem,
-  Mesh,
-  CameraComparator,
-  RendererComparator,
-  SceneComparator,
-  MeshComparator,
-  CameraRepository,
-  Object3dTransformSystem,
-  MeshRepository,
-  Colliders2dDebugSystem,
-  Collider2dComparator
-} from "@ecsx/threejs";
-import {BoxBufferGeometry, MeshBasicMaterial, MeshNormalMaterial, Object3D} from "three";
-import {BodyComparator, Engine as MatterEngine, EngineComparator, EngineSystem, RootEngine} from "@ecsx/matterjs";
-import {GameObject, ContainerTag} from "./Tags";
-import {TestSystem} from "./TestSystem";
-import {TransformComparator} from "../../../packages/core/src/Comparators/TransformComparator";
+  ActiveCannons,
+  MovementAcceleration, MovementAngularAcceleration,
+  MovementMaxAngularSpeed,
+  MovementMaxSpeed,
+  Player,
+  PlayerCamera,
+  Ship
+} from "./components";
+import {BasicBody} from "./ship/bodies/BasicBody";
+import {CannonsRenderSystem} from "./systems/CannonsRenderSystem";
+import {RemovedShipCannonsRemoveSystem} from "./systems/RemovedShipCannonsRemoveSystem";
+import {CannonsDestroySystem} from "./systems/CannonsDestroySystem";
+import {CannonsBuildSystem} from "./systems/CannonsBuildSystem";
+import {CannonsIdleSystem} from "./systems/CannonsIdleSystem";
+import {CannonsShotSystem} from "./systems/CannonsShotSystem";
+import * as ECSMATTER from "@ecsx/matterjs"
+import * as Matter from "matter-js";
+import {Object3dMatterPhysicsSystem} from "./systems/Object3dMatterPhysicsSystem";
+import {PlayerCameraViewSystem} from "./systems/PlayerCameraViewSystem";
+import {MovementInputSystem} from "./systems/MovementInputSystem";
+import {MovementSystem} from "./systems/MovementSystem";
+import {MovementDecreaseAngularVelocitySystem} from "./systems/MovementDecreaseAngularVelocitySystem";
+import {MovementLimitSystem} from "./systems/MovementLimitSystem";
+import {MovementDecreaseVelocitySystem} from "./systems/MovementDecreaseVelocitySystem";
 
-const ecs = new Engine();
+const engine = new Engine();
 
-const mesh = new Entity();
-mesh.addComponent(Mesh).set('geometry', new BoxBufferGeometry(1, 1, 1));
-mesh.getComponent(Mesh).set('material', new MeshNormalMaterial());
-mesh.addComponent(Collider2d).set('vertices', [[
-  {x: -1, y: 1},
-  {x: 1, y: 1},
-  {x: 1, y: -1},
-  {x: -1, y: -1}]]);
-mesh.addComponent(Transform);
-mesh.addComponent(RigidBody);
-mesh.addComponent(GameObject);
+const rendererEntity = engine.createNextEntity();
+rendererEntity.setComponent(Renderer, {renderer: new THREE.WebGLRenderer()});
+const scene = new THREE.Scene();
+rendererEntity.setComponent(Scene, {scene: scene});
+rendererEntity.setComponent(Camera, {camera: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)});
+rendererEntity.getComponent(Renderer).renderer.setSize(window.innerWidth, window.innerHeight);
+document.getElementById('content')!.appendChild(rendererEntity.getComponent(Renderer).renderer.domElement);
+rendererEntity.setComponent(PlayerCamera, {zoom: 6, lerp: .2});
+const physics = Matter.Engine.create();
+physics.world.gravity.y = 0;
+rendererEntity.setComponent(ECSMATTER.Engine, {engine: physics});
 
-const mesh2 = new Entity();
-mesh2.addComponent(Mesh).set('geometry', new BoxBufferGeometry(1, 1, 1));
-mesh2.getComponent(Mesh).set('material', new MeshNormalMaterial());
+engine.addEntity(rendererEntity);
 
-const floor = new Entity();
-floor.addComponent(Mesh).set('geometry', new BoxBufferGeometry(1, 1, 1));
-floor.getComponent(Mesh).set('material', new MeshBasicMaterial({color: 0xffaa00}));
-floor.addComponent(Transform);
-floor.getComponent(Transform).set("positionY", -2);
-floor.getComponent(Transform).set("scaleX", 2);
-floor.getComponent(Transform).set("scaleZ", 3);
-floor.getComponent(Transform).set("scaleY", .3);
-floor.addComponent(Collider2d).set('vertices', [[
-  {x: -1, y: 1},
-  {x: 1, y: 1},
-  {x: 1, y: -1},
-  {x: -1, y: -1}]]);
-floor.addComponent(RigidBody).set('isStatic', true);
+// Test ship
+const shipEntity = engine.createNextEntity();
+shipEntity.setComponent(Player, {});
+shipEntity.setComponent(Ship, {body: new BasicBody()});
+shipEntity.setComponent(ParentObject3D, {object3D: scene});
+shipEntity.setComponent(ActiveCannons, {activeCannonsHooks: ['cannon-0', 'cannon-1']});
+shipEntity.setComponent(ECSMATTER.Body, {
+  body: Matter.Bodies.circle(0, 0, 50, {frictionAir: 0, mass: 1}),
+  engine: rendererEntity
+});
+shipEntity.setComponent(MovementMaxSpeed, {maxSpeed: 3});
+shipEntity.setComponent(MovementAcceleration, {acceleration: 1});
+shipEntity.setComponent(MovementMaxAngularSpeed, {maxAngularSpeed: .07});
+shipEntity.setComponent(MovementAngularAcceleration, {angularAcceleration: .03});
+engine.addEntity(shipEntity);
 
-const group = new Entity();
-group.addComponent(Container).set('children', [mesh2, mesh]);
-group.addComponent(Transform).set('positionY', 2);
-group.addComponent(ContainerTag);
+let counter = 0;
+setInterval(() => {
+  counter++;
+  if (counter % 2) {
+    shipEntity.setComponent(MovementMaxSpeed, {maxSpeed: 10});
+    shipEntity.setComponent(MovementAcceleration, {acceleration: 20});
+    shipEntity.setComponent(MovementAngularAcceleration, {angularAcceleration: .45});
+  } else {
+    shipEntity.setComponent(MovementMaxSpeed, {maxSpeed: 3});
+    shipEntity.setComponent(MovementAcceleration, {acceleration: 1});
+    shipEntity.setComponent(MovementAngularAcceleration, {angularAcceleration: .03});
+  }
+}, 10000);
 
-const camera = new Entity();
-camera.addComponent(Camera).set('aspect', 3);
-camera.addComponent(Transform).set("positionZ", 10);
-camera.addComponent(CameraAutoAspect);
+// Physics
 
-const scene = new Entity();
-scene.addComponent(Scene);
-scene.addComponent(Transform);
-scene.addComponent(MatterEngine);
-scene.addComponent(Container).set('children', [group, floor]);
+const ship2Entity = engine.createNextEntity();
+ship2Entity.setComponent(Ship, {body: new BasicBody()});
+ship2Entity.setComponent(ParentObject3D, {object3D: scene});
+ship2Entity.setComponent(ECSMATTER.Body, {
+  body: Matter.Bodies.rectangle(10, -100, 50, 50),
+  engine: rendererEntity
+});
+engine.addEntity(ship2Entity);
 
-const renderer = new Entity();
-renderer.addComponent(Renderer).set('container', document.getElementById('content')!);
-renderer.getComponent(Renderer).set('items', [{
-  scene: scene,
-  camera: camera
-}]);
+// Light
+const ambientLightEntity = engine.createNextEntity();
+ambientLightEntity.setComponent(Object3D, {object3D: new THREE.AmbientLight(0x404040)});
+ambientLightEntity.setComponent(ParentObject3D, {object3D: scene});
+engine.addEntity(ambientLightEntity);
 
-ecs.addEntity(renderer);
-ecs.addEntity(camera);
-ecs.addEntity(scene);
+const hemisphereLightEntity = engine.createNextEntity();
+hemisphereLightEntity.setComponent(Object3D, {object3D: new THREE.HemisphereLight(0xffffbb, 0x080820, 1)});
+hemisphereLightEntity.setComponent(ParentObject3D, {object3D: scene});
+engine.addEntity(hemisphereLightEntity);
 
-const transformComparator = new TransformComparator();
-
-// Three js
-const threeRendererComparator = new RendererComparator();
-const threeSceneComparator = new SceneComparator();
-const threeCameraComparator = new CameraComparator();
-const threeMeshComparator = new MeshComparator(threeSceneComparator);
-const threeCollider2dComparator = new Collider2dComparator(threeSceneComparator);
-
-const threeCameraRepository = new CameraRepository(threeCameraComparator);
-const threeMeshRepository = new MeshRepository(threeMeshComparator);
-const objects3dRepository = new CompositeRepository<Object3D>(threeCameraRepository, threeSceneComparator, threeMeshRepository);
-
-// Matter js
-const matterEngineComparator = new EngineComparator();
-const matterBodyComparator = new BodyComparator(matterEngineComparator);
+// Grid
+const gridEntity = engine.createNextEntity();
+gridEntity.setComponent(Object3D, {object3D: new THREE.GridHelper(1000, 500)});
+gridEntity.setComponent(ParentObject3D, {object3D: scene});
+engine.addEntity(gridEntity);
 
 // Systems
-ecs.addSystem(new CompareSystem(transformComparator, Transform));
-ecs.addSystem(new CompareSystem(threeRendererComparator, Renderer));
-ecs.addSystem(new CompareSystem(threeSceneComparator, Scene));
-ecs.addSystem(new CompareSystem(threeCameraComparator, Camera));
-ecs.addSystem(new CompareSystem(threeMeshComparator, Mesh));
-ecs.addSystem(new CompareSystem(threeCollider2dComparator, Collider2d));
-ecs.addSystem(new CompareSystem(matterEngineComparator, MatterEngine));
-ecs.addSystem(new CompareSystem(matterBodyComparator, RootEngine, Collider2d, RigidBody));
+engine.addSystem(new MovementInputSystem());
+engine.addSystem(new MovementDecreaseVelocitySystem());
+engine.addSystem(new MovementDecreaseAngularVelocitySystem());
+engine.addSystem(new MovementSystem());
+engine.addSystem(new MovementLimitSystem());
+engine.addSystem(new CannonsIdleSystem());
+engine.addSystem(new CannonsBuildSystem());
+engine.addSystem(new CannonsDestroySystem());
+engine.addSystem(new CannonsShotSystem());
+engine.addSystem(new ShipRendererSystem());
+engine.addSystem(new RemovedShipCannonsRemoveSystem());
+engine.addSystem(new CannonsRenderSystem());
+engine.addSystem(new PlayerCameraViewSystem());
+engine.addSystem(new ECSMATTER.BodySystem());
+engine.addSystem(new ECSMATTER.EngineSystem());
+engine.addSystem(new Object3dMatterPhysicsSystem());
+engine.addSystem(new RendererSystem());
 
-ecs.addSystem(new AutoEngineAddSystem());
-ecs.addSystem(new ContainerSystem());
-ecs.addSystem(new SceneSystem());
-//ecs.addSystem(new EngineSystem(matterEngineComparator, matterBodyComparator));
-ecs.addSystem(new CameraAutoAspectSystem());
-ecs.addSystem(new TestSystem());
-ecs.addSystem(new Colliders2dDebugSystem(threeCollider2dComparator, 0));
-ecs.addSystem(new Object3dTransformSystem(objects3dRepository));
-ecs.addSystem(new RendererSystem(threeRendererComparator, threeSceneComparator, threeCameraRepository));
-
+const clock = new THREE.Clock();
 (function animate() {
   requestAnimationFrame(animate);
-  ecs.update(1);
+  engine.update(clock.getDelta());
 })();
+
+const ws = new WebSocket('ws://localhost:8080/');
+ws.addEventListener('open', () => {
+  ws.send('something');
+});

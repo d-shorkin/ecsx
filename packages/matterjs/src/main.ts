@@ -1,2 +1,3 @@
 export * from './Helpers/MatterPolygonFactory';
-export * from './Systems/EngineSystem';
+export * from './Systems';
+export * from './components';

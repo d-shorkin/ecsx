@@ -17,9 +17,12 @@
     "webpack-dev-server": "^3.10.3",
     "@ecsx/core": "*",
     "@ecsx/threejs": "*",
-    "@ecsx/matterjs": "*"
+    "@ecsx/matterjs": "*",
+    "@types/matter-js": "^0.14.5"
   },
   "dependencies": {
-    "three": "^0.115.0"
+    "three": "^0.115.0",
+    "matter-js": "^0.14.2",
+    "pixi.js": "*"
   }
 }
