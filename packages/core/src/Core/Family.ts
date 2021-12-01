@@ -53,7 +53,13 @@ export class Family implements IEntityCollection {
     return this.entitiesArray;
   }
 
-  private updateEntities(){
+  each(cb: (entity: IEntity, index: number, entities: IEntity[]) => void): IEntityCollection {
+    this.updateEntities();
+    this.entitiesArray.forEach(cb)
+    return this;
+  }
+
+  private updateEntities() {
     if (!this.hasRemovedEntities && !this.hasUpdatedEntities) {
       return
     }
@@ -88,10 +94,5 @@ export class Family implements IEntityCollection {
     }
 
     return true;
-  }
-
-  each(cb: (entity: IEntity, index: number, entities: IEntity[]) => void): IEntityCollection {
-    this.entitiesArray.forEach(cb)
-    return this;
   }
 }

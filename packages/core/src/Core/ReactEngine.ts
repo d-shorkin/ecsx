@@ -71,7 +71,7 @@ export class ReactEngine implements IReactEngine {
 
   onUpdate<T>(options: IReactFactoryOptions<T>, callback: (data: (EntityUpdateEvent & { component: T; prev: T })) => void): this {
     if (!this.reactComponents.includes(options.type)) {
-      this.reactComponents.push(options.type)
+      this.reactComponents = [...this.reactComponents, options.type];
     }
     const tag = options.type.tag || options.type.name;
     if (!this.observers.update[tag]) {
@@ -86,7 +86,7 @@ export class ReactEngine implements IReactEngine {
     return this;
   }
 
-  getReactComponents(): ComponentConstructor[] {
+  getImmutableReactComponents(): ComponentConstructor[] {
     return this.reactComponents;
   }
 

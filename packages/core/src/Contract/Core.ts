@@ -29,15 +29,13 @@ export interface EntityUpdateEvent<T extends IComponent = IComponent> {
 export type EntityReactEvents = {
   createComponent: (data: EntityUpdateEvent & { component: IComponent }) => void;
   removeComponent: (data: EntityUpdateEvent & { component: IComponent }) => void;
-  updateComponent: (data: EntityUpdateEvent & { component: IComponent, prev: IComponent }) => void;
+  updateComponent: (data: EntityUpdateEvent & { component: Readonly<IComponent>, prev: IComponent }) => void;
 };
 
 export type EngineEvents = {
   entityAdded: (entity: IEntity) => void;
   entityRemoved: (entity: IEntity) => void;
   entityUpdated: (entity: IEntity) => void;
-  beforeUpdate: (engine: IEngine) => void;
-  afterUpdate: (engine: IEngine) => void;
   entitySetComponent: (event: EntityUpdateEvent) => void;
   entityRemoveComponent: (event: EntityUpdateEvent) => void;
 };
@@ -116,7 +114,7 @@ export interface IFamilyFactory {
 }
 
 export interface IReactComponentsCollection {
-  getReactComponents(): ComponentConstructor[],
+  getImmutableReactComponents(): ComponentConstructor[],
 
   isReactComponent(componentClass: ComponentConstructor): boolean
 }

@@ -13,12 +13,13 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
   private readonly components: { [tag: string]: IComponent } = {};
   private readonly componentClasses: { [tag: string]: ComponentConstructor } = {};
   private readonly id: number = 0;
-  private readonly reactComponents: IReactComponentsCollection;
+  private readonly reactComponentsCollection: IReactComponentsCollection;
+  private lastReactiveComponents: ComponentConstructor[] = [];
 
   constructor(id: number, reactComponents: IReactComponentsCollection) {
     super();
     this.id = id;
-    this.reactComponents = reactComponents;
+    this.reactComponentsCollection = reactComponents;
   }
 
   getId(): number {
@@ -61,6 +62,7 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
   }
 
   getComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): T {
+    this.checkReactivity();
     const tag = componentClass.tag || componentClass.name;
     const component = this.components[tag] as T;
     if (!component) {
@@ -71,10 +73,11 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
         `There are multiple classes with the same tag or name "${tag}".\nAdd a different property "tag" to one of them.`
       );
     }
-    return this.wrapComponent(componentClass, component);
+    return component;
   }
 
   setComponent<T extends IComponent>(componentClass: ComponentConstructor<T>, data: ComponentData<T>): T {
+    this.checkReactivity();
     const tag = componentClass.tag || componentClass.name;
     let component = this.components[tag] as T;
     const isCreating = !component;
@@ -85,24 +88,28 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
         );
       }
     } else {
-      // todo: make proxy here?
-      component = new componentClass()
+      component = new componentClass();
       this.components[tag] = component;
     }
 
     if (isCreating) {
-      Object.keys(data).forEach((key) => component[key] = data[key])
+      Object.keys(data).forEach((key) => component[key] = data[key]);
       this.emit("createComponent", {componentClass, tag, component, entity: this});
     } else {
-      const old = new componentClass()
-      Object.keys(component).forEach((key) => old[key] = component[key])
-      Object.keys(data).forEach((key) => component[key] = data[key])
+      const old = new componentClass();
+      Object.keys(component).forEach((key) => old[key] = component[key]);
+      Object.keys(data).forEach((key) => component[key] = data[key]);
       this.emit("updateComponent", {componentClass, tag, component, prev: old, entity: this});
     }
 
     this.componentClasses[tag] = componentClass;
 
-    return this.wrapComponent(componentClass, component);
+    if (this.reactComponentsCollection.isReactComponent(componentClass)) {
+      component = this.makeComponentReactive(componentClass, component)
+      this.components[tag] = component;
+    }
+
+    return component;
   }
 
   removeComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): void {
@@ -121,20 +128,45 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
     this.emit("removeComponent", {componentClass, tag, component, entity: this});
   }
 
-  private wrapComponent<T extends IComponent>(componentClass: ComponentConstructor<T>, component: T): T {
-    if(!this.reactComponents.isReactComponent(componentClass)){
-      return component;
+  private checkReactivity() {
+    const newReactiveComponents = this.reactComponentsCollection.getImmutableReactComponents();
+    if (newReactiveComponents === this.lastReactiveComponents) {
+      return;
     }
 
-    return new Proxy(component, {
-      set: (target: T, p: PropertyKey, value: any): boolean => {
-        const old = new componentClass()
-        Object.keys(component).forEach((key) => old[key] = target[key])
-        target[p] = value;
-        const tag = componentClass.tag || componentClass.name;
-        this.emit("updateComponent", {componentClass, tag, component: target, prev: old, entity: this})
-        return true;
+    Object.keys(this.components).forEach((tag) => {
+      const componentClass = this.componentClasses[tag];
+      if (newReactiveComponents.includes(componentClass) && !this.lastReactiveComponents.includes(componentClass)) {
+        this.components[tag] = this.makeComponentReactive(componentClass, this.components[tag]);
+      } else if (!newReactiveComponents.includes(componentClass) && this.lastReactiveComponents.includes(componentClass)) {
+        const old = this.components[tag];
+        const component = new componentClass();
+        Object.keys(old).forEach((key) => component[key] = old[key]);
+        this.components[tag] = Object.seal(component)
       }
-    })
+    });
+
+    this.lastReactiveComponents = newReactiveComponents;
+  }
+
+  private makeComponentReactive<T extends IComponent>(componentClass: ComponentConstructor<T>, component: T): T {
+    const tag = componentClass.tag || componentClass.name;
+    const h = new componentClass();
+    const c = new componentClass();
+    Object.keys(component).forEach(p => {
+      h[p] = component[p];
+      Object.defineProperty(c, p, {
+        configurable: false,
+        get: () => h[p],
+        set: v => {
+          const old = new componentClass();
+          Object.keys(component).forEach((key) => old[key] = component[key]);
+          h[p] = v;
+          this.emit("updateComponent", {componentClass, tag, component, prev: old, entity: this})
+        }
+      });
+    });
+
+    return c
   }
 }

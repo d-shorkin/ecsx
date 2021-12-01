@@ -95,8 +95,6 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine {
   }
 
   update(delta: number): void {
-    this.emit("beforeUpdate", this);
-
     this.systems.forEach((system) => {
       if ('run' in system) {
         system.run(delta)
@@ -107,8 +105,6 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine {
       this.removingEntities.forEach(e => delete this.entities[e.getId()])
       this.entities = Object.values(this.entities)
     }
-
-    this.emit("afterUpdate", this);
   }
 
   createFamily(...components: ComponentFilter): IEntityCollection {
