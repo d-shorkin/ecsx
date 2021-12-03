@@ -77,39 +77,34 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
   }
 
   setComponent<T extends IComponent>(componentClass: ComponentConstructor<T>, data: ComponentData<T>): T {
-    this.checkReactivity();
     const tag = componentClass.tag || componentClass.name;
-    let component = this.components[tag] as T;
-    const isCreating = !component;
-    if (component) {
-      if (!castComponent(component, componentClass)) {
-        throw new Error(
-          `There are multiple classes with the same tag or name "${tag}".\nAdd a different property "tag" to one of them.`
-        );
-      }
-    } else {
-      component = new componentClass();
-      this.components[tag] = component;
+    const component = this.components[tag] as T;
+    if (component && !castComponent(component, componentClass)) {
+      throw new Error(
+        `There are multiple classes with the same tag or name "${tag}".\nAdd a different property "tag" to one of them.`
+      );
     }
 
-    if (isCreating) {
-      Object.keys(data).forEach((key) => component[key] = data[key]);
-      this.emit("createComponent", {componentClass, tag, component, entity: this});
-    } else {
-      const old = new componentClass();
-      Object.keys(component).forEach((key) => old[key] = component[key]);
-      Object.keys(data).forEach((key) => component[key] = data[key]);
-      this.emit("updateComponent", {componentClass, tag, component, prev: old, entity: this});
+    let nComponent = new componentClass();
+    Object.keys(data).forEach((key) => nComponent[key] = data[key]);
+
+    const isReact = this.reactComponentsCollection.isReactComponent(componentClass);
+
+    if (isReact) {
+      nComponent = this.makeComponentReactive(componentClass, nComponent);
+      !this.lastReactiveComponents.includes(componentClass) && this.lastReactiveComponents.push(componentClass)
     }
 
+    if (!component) {
+      this.emit("createComponent", {componentClass, tag, component: nComponent, entity: this});
+    } else if (isReact) {
+      this.emit("updateComponent", {componentClass, tag, component: nComponent, prev: component, entity: this});
+    }
+
+    this.components[tag] = Object.seal(nComponent);
     this.componentClasses[tag] = componentClass;
 
-    if (this.reactComponentsCollection.isReactComponent(componentClass)) {
-      component = this.makeComponentReactive(componentClass, component)
-      this.components[tag] = component;
-    }
-
-    return component;
+    return nComponent;
   }
 
   removeComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): void {
@@ -137,7 +132,9 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
     Object.keys(this.components).forEach((tag) => {
       const componentClass = this.componentClasses[tag];
       if (newReactiveComponents.includes(componentClass) && !this.lastReactiveComponents.includes(componentClass)) {
-        this.components[tag] = this.makeComponentReactive(componentClass, this.components[tag]);
+        this.components[tag] = Object.seal(
+          this.makeComponentReactive(componentClass, this.components[tag])
+        );
       } else if (!newReactiveComponents.includes(componentClass) && this.lastReactiveComponents.includes(componentClass)) {
         const old = this.components[tag];
         const component = new componentClass();
@@ -160,13 +157,13 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
         get: () => h[p],
         set: v => {
           const old = new componentClass();
-          Object.keys(component).forEach((key) => old[key] = component[key]);
+          Object.keys(component).forEach((key) => old[key] = h[key]);
           h[p] = v;
           this.emit("updateComponent", {componentClass, tag, component, prev: old, entity: this})
         }
       });
     });
 
-    return c
+    return c;
   }
 }

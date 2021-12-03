@@ -27,9 +27,9 @@ export interface EntityUpdateEvent<T extends IComponent = IComponent> {
 }
 
 export type EntityReactEvents = {
-  createComponent: (data: EntityUpdateEvent & { component: IComponent }) => void;
-  removeComponent: (data: EntityUpdateEvent & { component: IComponent }) => void;
-  updateComponent: (data: EntityUpdateEvent & { component: Readonly<IComponent>, prev: IComponent }) => void;
+  createComponent: <T extends IComponent>(data: EntityUpdateEvent<T> & { component: Readonly<T> }) => void;
+  removeComponent: <T extends IComponent>(data: EntityUpdateEvent<T> & { component: Readonly<T> }) => void;
+  updateComponent: <T extends IComponent>(data: EntityUpdateEvent<T> & { component: Readonly<T>, prev: Readonly<T> }) => void;
 };
 
 export type EngineEvents = {
