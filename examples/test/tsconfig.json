@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist/",
+    "noImplicitAny": true,
+    "module": "es2020",
+    "target": "es5",
+    "allowJs": true,
+    "moduleResolution": "Node",
+    "lib": [
+      "es2015",
+      "webworker",
+      "dom"
+    ]
+  }
+}
