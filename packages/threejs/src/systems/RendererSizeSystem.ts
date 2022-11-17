@@ -1,20 +1,16 @@
-import {EntityUpdateEvent, IEngine, IReactFactory, IReactSystem} from "@ecsx/core";
+import {EntityUpdateEvent, IEngine, ISystem} from "@ecsx/core";
 import {RendererComponent, RendererSizeComponent} from "../components";
 
-export class RendererSizeSystem implements IReactSystem {
+export class RendererSizeSystem implements ISystem {
   attach(engine: IEngine): void {
-
-  }
-
-  react(factory: IReactFactory): void {
-    factory.onCreate(
+    engine.react().onCreate(
       {
         type: RendererSizeComponent,
         filter: [RendererComponent]
       },
       this.changeSize
     )
-    factory.onUpdate(
+    engine.react().onUpdate(
       {
         type: RendererSizeComponent,
         filter: [RendererComponent]

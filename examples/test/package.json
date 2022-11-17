@@ -17,6 +17,9 @@
     "webpack-dev-server": "^4.9.3"
   },
   "dependencies": {
-    "@ecsx/core": "*"
+    "@ecsx/core": "*",
+    "@ecsx/threejs": "*",
+    "@types/three": "^0.146.0",
+    "three": "^0.146.0"
   }
 }

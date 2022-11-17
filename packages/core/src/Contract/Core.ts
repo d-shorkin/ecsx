@@ -26,10 +26,14 @@ export interface EntityUpdateEvent<T extends IComponent = IComponent> {
   componentClass: ComponentConstructor<T>
 }
 
+export type ReactCreateEvent<T extends IComponent> = EntityUpdateEvent & { component: T }
+export type ReactRemoveEvent<T extends IComponent> = ReactCreateEvent<T>
+export type ReactUpdateEvent<T extends IComponent> = EntityUpdateEvent & { component: T, prev: T }
+
 export type EntityReactEvents = {
-  createComponent: (data: EntityUpdateEvent & { component: IComponent }) => void;
-  removeComponent: (data: EntityUpdateEvent & { component: IComponent }) => void;
-  updateComponent: (data: EntityUpdateEvent & { component: IComponent, prev: IComponent }) => void;
+  createComponent: (data: ReactCreateEvent<IComponent>) => void;
+  removeComponent: (data: ReactRemoveEvent<IComponent>) => void;
+  updateComponent: (data: ReactUpdateEvent<IComponent>) => void;
 };
 
 export type EngineEvents = {
@@ -71,10 +75,6 @@ export interface ISystem {
   attach(engine: IEngine): void;
 }
 
-export interface IInitSystem extends ISystem {
-  init(): void
-}
-
 export interface IRunSystem extends ISystem {
   run(delta: number): void
 }
@@ -83,11 +83,7 @@ export interface IDestroySystem extends ISystem {
   destroy(): void
 }
 
-export interface IReactSystem extends ISystem {
-  react(factory: IReactFactory): void
-}
-
-export type SystemType = IInitSystem | IRunSystem | IDestroySystem | IReactSystem;
+export type SystemType = ISystem | (IRunSystem | IDestroySystem);
 
 export interface IEngine extends IEventEmitter<EngineEvents>, IEntityCollection, IFamilyFactory {
   createEntity(): IEntity
@@ -101,6 +97,8 @@ export interface IEngine extends IEventEmitter<EngineEvents>, IEntityCollection,
   removeSystem(system: SystemType): void;
 
   update(delta: number): void;
+
+  react(): IReactFactory;
 }
 
 export interface IEntityCollection {
@@ -127,15 +125,17 @@ export interface IReactFactoryOptions<T extends IComponent> {
 }
 
 export interface IReactFactory {
-  onCreate<T>(options: IReactFactoryOptions<T>, callback: (data: EntityUpdateEvent & { component: T }) => void): this
+  onCreate<T extends IComponent>(options: IReactFactoryOptions<T>, callback: (data: ReactCreateEvent<T>) => void): this
 
-  onRemove<T>(options: IReactFactoryOptions<T>, callback: (data: EntityUpdateEvent & { component: T }) => void): this
+  onRemove<T extends IComponent>(options: IReactFactoryOptions<T>, callback: (data: ReactRemoveEvent<T>) => void): this
 
-  onUpdate<T>(options: IReactFactoryOptions<T>, callback: (data: EntityUpdateEvent & { component: T, prev: T }) => void): this
+  onUpdate<T extends IComponent>(options: IReactFactoryOptions<T>, callback: (data: ReactUpdateEvent<T>) => void): this
 }
 
 
 export interface IReactEngine extends IReactFactory, IReactComponentsCollection {
+  setCurrentSystem(system: ISystem): void
+
   afterCreateComponent(data: EntityUpdateEvent & { component: IComponent }): void
 
   beforeRemoveComponent(data: EntityUpdateEvent & { component: IComponent }): void

@@ -1,15 +1,17 @@
 import {
-  ComponentConstructor,
+  ComponentConstructor, ReactCreateEvent, ReactRemoveEvent, ReactUpdateEvent,
   EntityUpdateEvent, IComponent, IEntityCollection, IFamilyFactory,
   IReactEngine,
-  IReactFactoryOptions
+  IReactFactoryOptions,
+  ISystem
 } from "../Contract/Core";
 
 export interface ReactEngineObserver<T extends IComponent, F extends (...args: any) => void> {
   collection: IEntityCollection,
   componentClass: ComponentConstructor,
   tag: string,
-  callback: F
+  callback: F,
+  system: ISystem
 }
 
 export interface ReactEngineObservers {
@@ -36,26 +38,46 @@ export class ReactEngine implements IReactEngine {
   private reactComponents: ComponentConstructor[] = [];
   private familyFactory: IFamilyFactory;
   private observers: ReactEngineObservers = {create: {}, remove: {}, update: {}}
+  private currentSystem: ISystem;
+  private events: Map<ISystem, Array<() => void>> = new Map();
 
   constructor(familyFactory: IFamilyFactory) {
     this.familyFactory = familyFactory;
   }
 
-  onCreate<T>(options: IReactFactoryOptions<T>, callback: (data: (EntityUpdateEvent & { component: T })) => void): this {
+  setCurrentSystem(system: ISystem): void {
+    if(this.events.has(system)){
+      this.events.get(system)!.forEach((cb) => cb())
+      this.events.delete(system)
+    }
+
+    this.currentSystem = system
+  }
+
+  onCreate<T extends IComponent>(options: IReactFactoryOptions<T>, callback: (data: ReactCreateEvent<T>) => void): this {
     const tag = options.type.tag || options.type.name;
     if (!this.observers.create[tag]) {
       this.observers.create[tag] = []
     }
+    const family = this.familyFactory.createFamily(...[...(options.filter || []), options.type]);
+    const wrapped = oneTimeAction(callback);
     this.observers.create[tag].push({
       componentClass: options.type,
-      collection: this.familyFactory.createFamily(...[...(options.filter || []), options.type]),
-      callback: oneTimeAction(callback),
-      tag
+      collection: family,
+      callback: wrapped,
+      tag,
+      system: this.currentSystem,
     })
+    family.each(entity => wrapped({
+      entity,
+      componentClass: options.type,
+      tag: options.type.tag || options.type.name,
+      component: entity.getComponent(options.type),
+    }))
     return this;
   }
 
-  onRemove<T>(options: IReactFactoryOptions<T>, callback: (data: (EntityUpdateEvent & { component: T })) => void): this {
+  onRemove<T extends IComponent>(options: IReactFactoryOptions<T>, callback: (data: ReactRemoveEvent<T>) => void): this {
     const tag = options.type.tag || options.type.name;
     if (!this.observers.remove[tag]) {
       this.observers.remove[tag] = []
@@ -64,12 +86,13 @@ export class ReactEngine implements IReactEngine {
       componentClass: options.type,
       collection: this.familyFactory.createFamily(...[...(options.filter || []), options.type]),
       callback: oneTimeAction(callback),
-      tag
+      tag,
+      system: this.currentSystem
     })
     return this;
   }
 
-  onUpdate<T>(options: IReactFactoryOptions<T>, callback: (data: (EntityUpdateEvent & { component: T; prev: T })) => void): this {
+  onUpdate<T extends IComponent>(options: IReactFactoryOptions<T>, callback: (data: ReactUpdateEvent<T>) => void): this {
     if (!this.reactComponents.includes(options.type)) {
       this.reactComponents.push(options.type)
     }
@@ -81,7 +104,8 @@ export class ReactEngine implements IReactEngine {
       componentClass: options.type,
       collection: this.familyFactory.createFamily(...[...(options.filter || []), options.type]),
       callback: oneTimeAction(callback),
-      tag
+      tag,
+      system: this.currentSystem
     })
     return this;
   }
@@ -99,11 +123,14 @@ export class ReactEngine implements IReactEngine {
     if (!observers) {
       return;
     }
-    observers.forEach(({collection, callback}) => {
+    observers.forEach(({collection, callback, system}) => {
       if (!collection.getEntityById(data.entity.getId())) {
         return
       }
-      callback(data)
+      if (this.currentSystem == system) {
+        return callback(data);
+      }
+      this.holdEvent(system,() => callback(data))
     })
   }
 
@@ -112,11 +139,15 @@ export class ReactEngine implements IReactEngine {
     if (!observers) {
       return;
     }
-    observers.forEach(({collection, callback}) => {
+    observers.forEach(({collection, callback, system}) => {
       if (!collection.getEntityById(data.entity.getId())) {
         return
       }
-      callback(data)
+      if (this.currentSystem == system) {
+        callback(data)
+        return ;
+      }
+      this.holdEvent(system,() => callback(data))
     })
   }
 
@@ -125,11 +156,22 @@ export class ReactEngine implements IReactEngine {
     if (!observers) {
       return;
     }
-    observers.forEach(({collection, callback}) => {
+    observers.forEach(({collection, callback, system}) => {
       if (!collection.getEntityById(data.entity.getId())) {
         return
       }
-      callback(data)
+      if (this.currentSystem == system) {
+        return callback(data);
+      }
+      this.holdEvent(system,() => callback(data))
     })
+  }
+
+  private holdEvent(system: ISystem, event: () => void) {
+    if (!this.events.has(system)) {
+      this.events.set(system, [event])
+    } else {
+      this.events.get(system)!.push(event)
+    }
   }
 }

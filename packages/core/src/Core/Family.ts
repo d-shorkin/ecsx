@@ -41,6 +41,7 @@ export class Family implements IEntityCollection {
     });
 
     this.entities = this.engine.getEntities().filter(this.isIncludedEntity.bind(this));
+    this.entitiesArray = Object.values(this.entities)
   }
 
   getEntityById(id: number): IEntity | null {
@@ -91,7 +92,7 @@ export class Family implements IEntityCollection {
   }
 
   each(cb: (entity: IEntity, index: number, entities: IEntity[]) => void): IEntityCollection {
-    this.entitiesArray.forEach(cb)
+    this.getEntities().forEach(cb)
     return this;
   }
 }

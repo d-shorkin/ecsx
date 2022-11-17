@@ -1,26 +1,52 @@
 import {
   ComponentConstructor,
+  IComponent,
   IEngine,
-  IEntityCollection,
-  IReactFactory,
-  IReactSystem,
-  IRunSystem,
-  ISystem
+  ISystem,
 } from "@ecsx/core";
-import {SyncComponent} from "../components/SyncComponent";
 
-export interface SyncConsumerConfig<T> {
-  component: ComponentConstructor<T>,
+export enum SyncConsumerSystemItemMethod {
+  CREATE = 'create',
+  UPDATE = 'update',
+  REMOVE = 'remove'
+}
 
+export interface SyncConsumerSystemItem<T extends IComponent = IComponent> {
+  component: ComponentConstructor<T>
+  methods: Array<SyncConsumerSystemItemMethod>
   stringify: (component: T) => string
 }
 
-export class SyncConsumerSystem implements IReactSystem {
+export interface Client {
+  prepareData(entityId: number, tag: string, data: string): void
+}
+
+export class SyncConsumerSystem implements ISystem {
+
+  private config: SyncConsumerSystemItem[]
+  private client: Client;
+
+  constructor(client: Client,config: SyncConsumerSystemItem[]) {
+    this.config = config;
+    this.client = client
+  }
 
   attach(engine: IEngine): void {
   }
 
-  react(factory: IReactFactory): void {
+/*  react(factory: IReactFactory): void {
+
+    this.config.forEach(({component, methods, stringify}) => {
+      if(methods.includes(SyncConsumerSystemItemMethod.CREATE)){
+        factory.onCreate({
+          type: component
+        }, ({entity, tag, component}) => {
+          entity.
+          stringify(component)
+        })
+      }
+    })
+
     factory.onCreate({
       type:
     }, ({entity}) => {
@@ -30,5 +56,5 @@ export class SyncConsumerSystem implements IReactSystem {
     factory.onUpdate()
 
     factory.onRemove()
-  }
+  }*/
 }

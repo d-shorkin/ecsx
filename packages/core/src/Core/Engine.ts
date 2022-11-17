@@ -6,7 +6,7 @@ import {
   IComponent,
   IEngine,
   IEntity,
-  IEntityCollection, IReactEngine,
+  IEntityCollection, IReactEngine, IReactFactory, ReactCreateEvent, ReactRemoveEvent, ReactUpdateEvent,
   SystemType
 } from "../Contract/Core";
 import {EventEmitter} from "../Events/EventEmitter";
@@ -71,11 +71,9 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine {
   }
 
   addSystem(system: SystemType): void {
-    system.attach(this)
+    this.reactEngine.setCurrentSystem(system)
 
-    if ('react' in system) {
-      system.react(this.reactEngine)
-    }
+    system.attach(this)
 
     this.systems.push(system)
   }
@@ -98,6 +96,7 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine {
     this.emit("beforeUpdate", this);
 
     this.systems.forEach((system) => {
+      this.reactEngine.setCurrentSystem(system)
       if ('run' in system) {
         system.run(delta)
       }
@@ -141,16 +140,20 @@ export class Engine extends EventEmitter<EngineEvents> implements IEngine {
     return this.families[key];
   }
 
-  private onComponentCreate = (data: EntityUpdateEvent & { component: IComponent }) => {
+  react(): IReactFactory {
+    return this.reactEngine;
+  }
+
+  private onComponentCreate = (data: ReactCreateEvent<IComponent>) => {
     this.emit("entityUpdated", data.entity);
     this.reactEngine.afterCreateComponent(data)
   };
 
-  private onComponentUpdate = (data: EntityUpdateEvent & { component: IComponent, prev: IComponent }) => {
+  private onComponentUpdate = (data: ReactUpdateEvent<IComponent>) => {
     this.reactEngine.updateComponent(data)
   };
 
-  private onComponentRemove = (data: EntityUpdateEvent & { component: IComponent }) => {
+  private onComponentRemove = (data: ReactRemoveEvent<IComponent>) => {
     this.reactEngine.beforeRemoveComponent(data)
     this.emit("entityUpdated", data.entity);
   };
