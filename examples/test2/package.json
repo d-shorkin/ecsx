@@ -1,5 +1,5 @@
 {
-  "name": "test",
+  "name": "test2",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -19,10 +19,11 @@
   },
   "dependencies": {
     "@ecsx/core": "*",
-    "@ecsx/threejs": "*",
-    "@types/three": "^0.146.0",
-    "three": "^0.146.0",
+    "@ecsx/pixijs": "*",
+    "@ecsx/entities-tree": "*",
     "stats.js": "^0.17.0",
-    "@types/stats": "^0.16.30"
+    "@types/stats": "^0.16.30",
+    "@pixi/app": "^7.2.4",
+    "@pixi/display": "^7.2.4"
   }
 }

@@ -1,82 +1,78 @@
-import {ComponentConstructor, IComponent, IEngine, IEntity, IEntityCollection} from "../Contract/Core";
+import {
+  ComponentConstructor,
+  IEngine,
+  IEntity,
+  IFamily,
+  IMutableEntityCollection
+} from "../Contract/Core";
+import {MutableEntityCollection} from "./MutableEntityCollection";
 
-export class Family implements IEntityCollection {
-  private engine: IEngine;
-  private included: ComponentConstructor<IComponent>[];
-  private excluded: ComponentConstructor<IComponent>[];
-
-  private entities: {[p: number]: IEntity} = {};
-  private entitiesArray: IEntity[] = [];
+export class Family implements IFamily {
+  private entities: IMutableEntityCollection = new MutableEntityCollection();
 
   // Optimisation
-  private removedEntities: { [p: string]: IEntity } = {};
-  private updatedEntities: { [p: string]: IEntity } = {};
-  private hasRemovedEntities: boolean = false;
-  private hasUpdatedEntities: boolean = false;
+  private removedEntities: IEntity[] = [];
+  private updatedEntities: IEntity[] = [];
 
   constructor(
-    engine: IEngine,
-    included: ComponentConstructor<IComponent>[],
-    excluded: ComponentConstructor<IComponent>[],
+    private engine: IEngine,
+    private included: ComponentConstructor[],
+    private excluded: ComponentConstructor[],
   ) {
-    this.engine = engine;
-    this.included = included;
-    this.excluded = excluded;
-
-
     this.engine.on("entityAdded", (entity) => {
       if (this.isIncludedEntity(entity)) {
-        this.entities[entity.getId()] = entity;
+        this.entities.add(entity);
       }
     });
 
     this.engine.on("entityRemoved", (entity) => {
-      this.removedEntities[entity.getId()] = entity;
-      this.hasRemovedEntities = true;
+      this.removedEntities.push(entity);
     });
 
     this.engine.on("entityUpdated", (entity) => {
-      this.updatedEntities[entity.getId()] = entity;
-      this.hasUpdatedEntities = true;
+      this.updatedEntities.push(entity);
     });
 
-    this.entities = this.engine.getEntities().filter(this.isIncludedEntity.bind(this));
-    this.entitiesArray = Object.values(this.entities)
+    this.engine.getCommonFamily().each((entity) => {
+      if (this.isIncludedEntity(entity)) {
+        this.entities.add(entity)
+      }
+    });
   }
 
-  getEntityById(id: number): IEntity | null {
+  get(id: number): IEntity | null {
     this.updateEntities();
-    return this.entities[id] || null
+    return this.entities.get(id)
   }
 
-  getEntities(): IEntity[] {
+  getAll(): IEntity[] {
     this.updateEntities();
-    return this.entitiesArray;
+    return this.entities.getAll();
+  }
+
+  each(cb: (entity: IEntity, index: number, entities: IEntity[]) => void) {
+    const entities = this.getAll();
+    for (let i = 0; i < entities.length; i++) {
+      cb(entities[i], i, entities)
+    }
   }
 
   private updateEntities(){
-    if (!this.hasRemovedEntities && !this.hasUpdatedEntities) {
+    if (!this.updatedEntities.length && !this.removedEntities.length) {
       return
     }
 
-    Object.keys(this.removedEntities).forEach((id) => delete this.entities[id])
-    Object.keys(this.updatedEntities).forEach((id) => {
-      const entity = this.entities[id];
-      if(!entity && this.isIncludedEntity(this.updatedEntities[id])){
-        this.entities[id] = this.updatedEntities[id]
-      }
-
-      if(entity && !this.isIncludedEntity(this.updatedEntities[id])){
-        delete this.entities[id]
+    this.removedEntities.forEach((entity) => this.entities.remove(entity.getId()))
+    this.updatedEntities.forEach((entity) => {
+      if(this.isIncludedEntity(entity)) {
+        this.entities.add(entity);
+      }else {
+        this.entities.remove(entity.getId());
       }
     })
 
-    this.entitiesArray = Object.values(this.entities)
-
-    this.updatedEntities = {};
-    this.removedEntities = {};
-    this.hasRemovedEntities = false;
-    this.hasUpdatedEntities = false;
+    this.updatedEntities = [];
+    this.removedEntities = [];
   }
 
   private isIncludedEntity(entity: IEntity): boolean {
@@ -89,10 +85,5 @@ export class Family implements IEntityCollection {
     }
 
     return true;
-  }
-
-  each(cb: (entity: IEntity, index: number, entities: IEntity[]) => void): IEntityCollection {
-    this.getEntities().forEach(cb)
-    return this;
   }
 }

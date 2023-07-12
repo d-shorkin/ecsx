@@ -9,9 +9,9 @@ import {castComponent} from "./Helpers";
 import {EventEmitter} from "../Events/EventEmitter";
 
 
-export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
-  private readonly components: { [tag: string]: IComponent } = {};
-  private readonly componentClasses: { [tag: string]: ComponentConstructor } = {};
+export class MapEntity extends EventEmitter<EntityReactEvents> implements IEntity {
+  private readonly components: Map<string, IComponent> = new Map();
+  private readonly componentClasses: Map<string, ComponentConstructor> = new Map();
   private readonly id: number = 0;
   private readonly watchComponents: IWatchComponentsCollection;
 
@@ -26,28 +26,39 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
   }
 
   listComponents(): IComponent[] {
-    return Object.keys(this.components).map(tag => this.components[tag]);
+    const components: IComponent[] = [];
+    this.components.forEach(v => components.push(v))
+    return components
   }
 
   listComponentsWithTypes(): { component: IComponent; type: ComponentConstructor }[] {
-    return Object.keys(this.components).map(tag => ({
-      component: this.components[tag],
-      type: this.componentClasses[tag]
-    }));
+    const components: { component: IComponent; type: ComponentConstructor }[] = [];
+
+    this.components.forEach((v, key) => {
+      const componentClass = this.componentClasses.get(key)
+      if (!componentClass) {
+        throw new Error(`Cannot find ${key} class`)
+      }
+      components.push({
+        component: v,
+        type: componentClass
+      })
+    })
+    return components
   }
 
   listComponentsWithTags(): { tag: string, component: IComponent }[] {
-    return Object.keys(this.components).map(tag =>
-      Object.freeze({
-        tag,
-        component: this.components[tag]
-      })
-    );
+    const components: { tag: string, component: IComponent }[] = [];
+
+    this.components.forEach((component, tag) => {
+      components.push({component, tag})
+    })
+    return components
   }
 
   hasComponent<T extends IComponent>(componentClass: ComponentConstructor<T>, existsCallback?: (component: T) => void) {
     const tag = componentClass.tag || componentClass.name;
-    const component = this.components[tag] as T;
+    const component = this.components.get(tag) as T;
     if (!component) return false;
     if (!castComponent(component, componentClass)) {
       throw new Error(
@@ -62,7 +73,7 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
 
   getComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): T {
     const tag = componentClass.tag || componentClass.name;
-    const component = this.components[tag] as T;
+    const component = this.components.get(tag) as T;
     if (!component) {
       throw new Error(`Cannot get component "${tag}" from entity.`);
     }
@@ -72,11 +83,12 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
       );
     }
     return this.wrapComponent(componentClass, component);
+    return component
   }
 
   setComponent<T extends IComponent>(componentClass: ComponentConstructor<T>, data: ComponentData<T>): T {
     const tag = componentClass.tag || componentClass.name;
-    let component = this.components[tag] as T;
+    let component = this.components.get(tag) as T;
     const isCreating = !component;
     if (component) {
       if (!castComponent(component, componentClass)) {
@@ -87,27 +99,29 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
     } else {
       // todo: make proxy here?
       component = new componentClass()
-      this.components[tag] = component;
+      this.components.set(tag, component);
     }
 
     if (isCreating) {
       Object.keys(data).forEach((key) => component[key] = data[key])
       this.emit("createComponent", {componentClass, tag, component, entity: this});
-    } else {
+    } else if (this.watchComponents.isWatchComponent(componentClass)) {
       const old = new componentClass()
       Object.keys(component).forEach((key) => old[key] = component[key])
       Object.keys(data).forEach((key) => component[key] = data[key])
       this.emit("updateComponent", {componentClass, tag, component, prev: old, entity: this});
+    } else {
+      Object.keys(data).forEach((key) => component[key] = data[key])
     }
 
-    this.componentClasses[tag] = componentClass;
+    this.componentClasses.set(tag, componentClass);
 
     return this.wrapComponent(componentClass, component);
   }
 
   removeComponent<T extends IComponent>(componentClass: ComponentConstructor<T>): void {
     const tag = componentClass.tag || componentClass.name;
-    const component = this.components[tag];
+    const component = this.components.get(tag);
     if (!component) {
       return;
     }
@@ -117,7 +131,7 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
       );
     }
 
-    delete this.components[tag];
+    this.components.delete(tag);
     this.emit("removeComponent", {componentClass, tag, component, entity: this});
   }
 
@@ -129,7 +143,7 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
   }
 
   private wrapComponent<T extends IComponent>(componentClass: ComponentConstructor<T>, component: T): T {
-    if(!this.watchComponents.isWatchComponent(componentClass)){
+    if (!this.watchComponents.isWatchComponent(componentClass)) {
       return component;
     }
 
