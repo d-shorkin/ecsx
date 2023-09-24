@@ -26,14 +26,15 @@ export interface EntityUpdateEvent<T extends IComponent = IComponent> {
   componentClass: ComponentConstructor<T>
 }
 
-export type ReactCreateEvent<T extends IComponent> = EntityUpdateEvent & { component: T }
+export type ReactCreateEvent<T extends IComponent> = EntityUpdateEvent<T> & { component: T }
 export type ReactRemoveEvent<T extends IComponent> = ReactCreateEvent<T>
-export type ReactUpdateEvent<T extends IComponent> = EntityUpdateEvent & { component: T, prev: T }
+export type ReactUpdateEvent<T extends IComponent> = EntityUpdateEvent<T> & { component: T, prev: T }
 
 export type EntityReactEvents = {
   createComponent: (data: ReactCreateEvent<IComponent>) => void;
   removeComponent: (data: ReactRemoveEvent<IComponent>) => void;
   updateComponent: (data: ReactUpdateEvent<IComponent>) => void;
+  createAction: (data: ReactCreateEvent<IComponent>) => void;
 };
 
 export type EngineEvents = {
@@ -42,8 +43,6 @@ export type EngineEvents = {
   entityUpdated: (entity: IEntity) => void;
   beforeUpdate: (engine: IEngine) => void;
   afterUpdate: (engine: IEngine) => void;
-  entitySetComponent: (event: EntityUpdateEvent) => void;
-  entityRemoveComponent: (event: EntityUpdateEvent) => void;
 };
 
 export type ComponentFilter = Array<ComponentConstructor |
@@ -58,7 +57,7 @@ export interface IEntity<A extends IComponent = IComponent> extends IEventEmitte
 
   listComponents(): IComponent[];
 
-  listComponentsWithTypes(): { component: IComponent; type: ComponentConstructor<IComponent> }[];
+  listComponentsWithTypes(): { component: IComponent; type: ComponentConstructor }[];
 
   listComponentsWithTags(): { tag: string, component: IComponent }[];
 
@@ -67,6 +66,8 @@ export interface IEntity<A extends IComponent = IComponent> extends IEventEmitte
   getComponent<T extends A>(componentClass: ComponentConstructor<T>): T;
 
   setComponent<T extends A>(componentClass: ComponentConstructor<T>, data: ComponentData<T>): T;
+
+  setAction<T extends A>(componentClass: ComponentConstructor<T>, data: ComponentData<T>): T;
 
   removeComponent<T extends A>(componentClass: ComponentConstructor<T>): void;
 }
@@ -85,10 +86,12 @@ export interface IDestroySystem extends ISystem {
 
 export type SystemType = ISystem | (IRunSystem | IDestroySystem);
 
-export interface IEngine extends IEventEmitter<EngineEvents>, IEntityCollection, IFamilyFactory {
+export interface IEngine extends IEventEmitter<EngineEvents>, IFamilyFactory, IWatchFamilyFactory {
   createEntity(): IEntity
 
   removeEntity(entity: IEntity): void;
+
+  getCommonFamily(): IFamily;
 
   addSystem(system: SystemType): void;
 
@@ -97,51 +100,62 @@ export interface IEngine extends IEventEmitter<EngineEvents>, IEntityCollection,
   removeSystem(system: SystemType): void;
 
   update(delta: number): void;
-
-  react(): IReactFactory;
 }
 
 export interface IEntityCollection {
-  getEntities(): IEntity[];
+  getAll(): IEntity[];
 
-  getEntityById(id: number): IEntity | null;
+  get(id: number): IEntity | null;
+}
 
-  each(cb: (entity: IEntity, index: number, entities: IEntity[]) => void): IEntityCollection
+export interface IMutableEntityCollection extends IEntityCollection{
+  add(entity: IEntity): IMutableEntityCollection;
+
+  remove(id: number): IMutableEntityCollection;
+
+  clear(): IMutableEntityCollection;
+}
+
+export interface IEntitiesHelper {
+  each(cb: (entity: IEntity, index: number, entities: IEntity[]) => void): void
+}
+
+export interface IFamily extends IEntityCollection, IEntitiesHelper {
 }
 
 export interface IFamilyFactory {
-  createFamily(...components: ComponentFilter): IEntityCollection;
+  createFamily(...components: ComponentFilter): IFamily;
 }
 
-export interface IReactComponentsCollection {
-  getReactComponents(): ComponentConstructor[],
+export interface IWatchComponentsCollection {
+  getWatchComponents(): ComponentConstructor[],
 
-  isReactComponent(componentClass: ComponentConstructor): boolean
+  isWatchComponent(componentClass: ComponentConstructor): boolean
 }
 
-export interface IReactFactoryOptions<T extends IComponent> {
-  type: ComponentConstructor<T>
-  filter?: ComponentFilter
+export interface IWatchEntry<T extends IComponent> {
+  entity: IEntity<T | IComponent>
+  componentClass: ComponentConstructor<T>
+  component: T | null
+  prev: T | null
 }
 
-export interface IReactFactory {
-  onCreate<T extends IComponent>(options: IReactFactoryOptions<T>, callback: (data: ReactCreateEvent<T>) => void): this
+export interface IWatchFamily<T extends IComponent = IComponent> {
+  getEntries(): Array<IWatchEntry<T>>;
 
-  onRemove<T extends IComponent>(options: IReactFactoryOptions<T>, callback: (data: ReactRemoveEvent<T>) => void): this
+  each(cb: (entry: IWatchEntry<T>, index: number, entries: Array<IWatchEntry<T>>) => void)
 
-  onUpdate<T extends IComponent>(options: IReactFactoryOptions<T>, callback: (data: ReactUpdateEvent<T>) => void): this
+  clearEntries(): void
 }
 
-
-export interface IReactEngine extends IReactFactory, IReactComponentsCollection {
-  setCurrentSystem(system: ISystem): void
-
-  afterCreateComponent(data: EntityUpdateEvent & { component: IComponent }): void
-
-  beforeRemoveComponent(data: EntityUpdateEvent & { component: IComponent }): void
-
-  updateComponent(data: EntityUpdateEvent & { component: IComponent, prev: IComponent }): void
+export enum WatchType {
+  CREATED,
+  UPDATED,
+  REMOVED
 }
 
+export interface IWatchFamilyFactory {
+  createWatchFamily<T extends IComponent>(type: WatchType[], watch: ComponentConstructor<T>, filter?: ComponentFilter, autoClear?: boolean): IWatchFamily<T>;
+}
 
 

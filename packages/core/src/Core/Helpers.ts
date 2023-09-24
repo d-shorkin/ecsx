@@ -1,6 +1,6 @@
 import {
-  ComponentConstructor,
-  IComponent, IEntity, IEntityCollection,
+  ComponentConstructor, ComponentFilter,
+  IComponent,
   NotComponent,
 } from "../Contract/Core";
 
@@ -11,38 +11,27 @@ export function castComponent<T extends IComponent>(
   return !!(component && component instanceof componentClass);
 }
 
-export class EntityCompositeCollection implements IEntityCollection {
-  private collections: IEntityCollection[] = [];
-
-  constructor(...collections: IEntityCollection[]) {
-    this.collections = collections;
-  }
-
-  getEntities(): IEntity[] {
-    return this.collections.reduce((acc, collection) => {
-      collection.getEntities().forEach(e => {
-        if(!acc.includes(e)){
-          acc.push(e);
-        }
-      });
-      return acc;
-    }, [] as IEntity[]);
-  }
-
-  getEntityById(id: number): IEntity | null {
-    return null;
-  }
-
-  each(cb: (entity: IEntity, index: number, entities: IEntity[]) => void): IEntityCollection {
-    this.collections.forEach(collection => collection.each(cb))
-    return this;
-  }
-}
-
-export function composeCollections(...collections: IEntityCollection[]): IEntityCollection {
-  return new EntityCompositeCollection(...collections);
-}
-
 export function Not<T extends IComponent>(componentClass: ComponentConstructor<T>): NotComponent<T> {
   return {not: componentClass};
+}
+
+export function parseFilter(filter?: ComponentFilter): {include: ComponentConstructor[], exclude: ComponentConstructor[]} {
+  const include: ComponentConstructor[] = [];
+  const exclude: ComponentConstructor[] = [];
+
+  if(!filter){
+    return {include, exclude}
+  }
+
+  for (let c of filter) {
+    if (typeof c === "object") {
+      if ('not' in c) {
+        exclude.push(c['not']);
+      }
+    } else {
+      include.push(c);
+    }
+  }
+
+  return {include, exclude}
 }

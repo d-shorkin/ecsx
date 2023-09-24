@@ -3,7 +3,7 @@ import {
   ComponentData,
   EntityReactEvents,
   IComponent,
-  IEntity, IReactComponentsCollection,
+  IEntity, IWatchComponentsCollection,
 } from "../Contract/Core";
 import {castComponent} from "./Helpers";
 import {EventEmitter} from "../Events/EventEmitter";
@@ -13,12 +13,12 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
   private readonly components: { [tag: string]: IComponent } = {};
   private readonly componentClasses: { [tag: string]: ComponentConstructor } = {};
   private readonly id: number = 0;
-  private readonly reactComponents: IReactComponentsCollection;
+  private readonly watchComponents: IWatchComponentsCollection;
 
-  constructor(id: number, reactComponents: IReactComponentsCollection) {
+  constructor(id: number, watchComponents: IWatchComponentsCollection) {
     super();
     this.id = id;
-    this.reactComponents = reactComponents;
+    this.watchComponents = watchComponents;
   }
 
   getId(): number {
@@ -121,8 +121,15 @@ export class Entity extends EventEmitter<EntityReactEvents> implements IEntity {
     this.emit("removeComponent", {componentClass, tag, component, entity: this});
   }
 
+  setAction<T extends IComponent>(componentClass: ComponentConstructor<T>, data: ComponentData<T>): T {
+    const tag = componentClass.tag || componentClass.name;
+    const component = this.setComponent(componentClass, data)
+    this.emit('createAction', {componentClass, tag, component, entity: this})
+    return component;
+  }
+
   private wrapComponent<T extends IComponent>(componentClass: ComponentConstructor<T>, component: T): T {
-    if(!this.reactComponents.isReactComponent(componentClass)){
+    if(!this.watchComponents.isWatchComponent(componentClass)){
       return component;
     }
 

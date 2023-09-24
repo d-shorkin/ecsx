@@ -1,11 +1,11 @@
 import {IEntity, IMutableEntityCollection} from "../Contract/Core";
 
 export class MutableEntityCollection implements IMutableEntityCollection {
-  private entities: { [id: number]: IEntity } = {};
+  private entities: Map<number, IEntity> = new Map();
   private entitiesArray: IEntity[] = [];
 
   get(id: number): IEntity | null {
-    return this.entities[id] || null;
+    return this.entities.get(id) || null;
   }
 
   getAll(): IEntity[] {
@@ -16,7 +16,7 @@ export class MutableEntityCollection implements IMutableEntityCollection {
     if(!!this.get(entity.getId())){
       return this;
     }
-    this.entities[entity.getId()] = entity;
+    this.entities.set(entity.getId(), entity);
     this.entitiesArray.push(entity);
     return this;
   }
@@ -27,15 +27,14 @@ export class MutableEntityCollection implements IMutableEntityCollection {
       return this;
     }
 
-    delete this.entities[id];
+    this.entities.delete(id);
     this.entitiesArray = this.entitiesArray.filter(e => e !== entity);
     return this;
   }
 
   clear(): IMutableEntityCollection {
-    this.entities = {};
-    this.entitiesArray = []
+    this.entities.clear();
+    this.entitiesArray.length = 0
     return this;
   }
-
 }
